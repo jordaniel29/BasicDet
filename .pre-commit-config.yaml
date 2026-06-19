@@ -14,7 +14,7 @@ repos:
     hooks:
       - id: mypy
         # Type-check the package source. Adjust the path as the repo grows.
-        files: ^src/
+        files: ^basicdet/
         additional_dependencies: []
 
   - repo: https://github.com/pre-commit/pre-commit-hooks

@@ -137,11 +137,22 @@ project/
 > A reusable master copy of the general sections above lives at
 > `~/.claude/templates/python-CLAUDE.md` — start new projects from there.
 
-**Purpose:** Fine-tuning and evaluating object-detection models (YOLO26, RF-DETR)
-for person detection — data processing, model training, and benchmarking only.
+**Purpose:** `basicdet` — a base framework for fine-tuning and evaluating
+object-detection models (YOLO26, RF-DETR), applied here to person detection.
+Data processing, model training, and benchmarking only.
 
 **Environment:** Managed with **conda** — env name `persondet`. Run
 `conda activate persondet` before any work, then `pip install -e ".[dev]"`.
+
+**Layout:** This project uses a **flat layout** (package `basicdet/` at the repo
+root, mirroring BasicSR), overriding the template's `src/` recommendation above.
+
+**Single config-driven entrypoint:** `basicdet/{train,evaluate,predict}.py` work
+for both models (entry points live inside the package, BasicSR-style; runnable as
+`python basicdet/train.py` because the package is pip-installed). The config's
+`family` field (`yolo` | `rfdetr`) selects the pipeline via `basicdet/utils/registry.py`.
+Add a model by adding a trainer module (exposing `train`/`evaluate`/`predict`) and
+one branch in the registry.
 
 **Scope boundaries:** fine-tuning and evaluation only — no deployment code
 (TensorRT/ONNX serving export, inference-time quantization, serving frameworks).
@@ -164,6 +175,8 @@ Deployment lives in a separate downstream repository.
   data *versions*, not data. Persist train/val/test splits deterministically.
 - **Device handling:** never hardcode `.cuda()`; take a `device` argument and
   auto-detect in one place.
-- **Suggested layout:** `configs/model/{yolo26,rf_detr}.yaml`, `configs/data/`,
-  `configs/train_config.yaml`; `src/<pkg>/{data,models,training,utils}/`;
-  `scripts/{train,evaluate}.py`.
+- **Layout** (BasicSR-style, organized by model family since the network/loss/
+  data are owned by Ultralytics/RF-DETR): `configs/*.yaml`;
+  `basicdet/{train,evaluate,predict}.py` (entry points); `basicdet/models/{yolo,rfdetr}.py`
+  (each owns train/evaluate/predict); `basicdet/metrics/coco.py`;
+  `basicdet/utils/{config,registry,tracking,seed,logging,runtime}.py`.

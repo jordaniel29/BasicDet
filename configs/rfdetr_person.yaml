@@ -1,0 +1,32 @@
+# RF-DETR person-detection fine-tuning experiment.
+# Loaded into a typed RFDETRExperimentConfig (basicdet/config.py).
+
+family: rfdetr          # selects the RF-DETR pipeline (see scripts/train.py)
+
+data:
+  # COCO-layout dir with train/ valid/ test/, each + an _annotations.coco.json.
+  dataset_dir: assets/data/persondet_v1.1/rfdetr
+
+model:
+  variant: base          # base (RFDETRBase) | large (RFDETRLarge)
+  resolution: null        # null = variant default; if set, must be divisible by 56
+  num_classes: null       # null = infer from dataset (correct for single-class person)
+
+train:
+  epochs: 50
+  batch_size: 4           # RF-DETR is memory-hungry; raise if VRAM allows
+  grad_accum_steps: 4     # effective batch = batch_size * grad_accum_steps
+  lr: 0.0001
+  num_workers: 8
+  seed: 42
+  early_stopping: true
+  tensorboard: false
+  output_dir: runs/rfdetr/person_det
+  run_name: person_det
+  extra: {}               # any extra kwargs forwarded to rfdetr's model.train()
+
+wandb:
+  enabled: true
+  project: person-det
+  entity: null            # null = your default W&B entity
+  log_model: true
