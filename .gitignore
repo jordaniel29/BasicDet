@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Environments
+.venv/
+venv/
+.env
+
+# uv
+# (uv.lock SHOULD be committed for reproducibility)
+
+# Tooling caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# ML artifacts — track versions, not data (use DVC / cloud storage)
+data/
+datasets/
+*.pt
+*.pth
+*.onnx
+checkpoints/
+runs/
+wandb/
+outputs/
+*.log
+
+# Notebooks
+.ipynb_checkpoints/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
