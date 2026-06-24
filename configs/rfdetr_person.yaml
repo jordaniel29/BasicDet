@@ -1,5 +1,10 @@
 # RF-DETR person-detection fine-tuning experiment.
 # Loaded into a typed RFDETRExperimentConfig (basicdet/config.py).
+#
+# Hyperparameters are aligned with configs/yolo26_person.yaml (epochs, effective
+# batch, workers, seed, early-stop patience) for a fair comparison — EXCEPT the
+# learning rate: RF-DETR is a DETR transformer and needs a low AdamW LR (~1e-4);
+# YOLO's 0.01 would diverge. Same training budget, architecture-appropriate LR.
 
 family: rfdetr          # selects the RF-DETR pipeline (see scripts/train.py)
 
@@ -8,22 +13,23 @@ data:
   dataset_dir: assets/data/persondet_v1.1/rfdetr
 
 model:
-  variant: base          # base (RFDETRBase) | large (RFDETRLarge)
+  variant: nano           # nano | small | medium | base | large
   resolution: null        # null = variant default; if set, must be divisible by 56
   num_classes: null       # null = infer from dataset (correct for single-class person)
 
 train:
-  epochs: 50
-  batch_size: 4           # RF-DETR is memory-hungry; raise if VRAM allows
-  grad_accum_steps: 4     # effective batch = batch_size * grad_accum_steps
-  lr: 0.0001
-  num_workers: 8
-  seed: 42
+  epochs: 100             # match YOLO
+  batch_size: 16          # match YOLO's batch (96GB VRAM handles this for nano)
+  grad_accum_steps: 1     # effective batch = 16, same as YOLO
+  lr: 0.0001              # DETR-appropriate; intentionally NOT YOLO's 0.01 (see header)
+  num_workers: 8          # match YOLO
+  seed: 42                # match YOLO
   early_stopping: true
   tensorboard: false
-  output_dir: runs/rfdetr/person_det
-  run_name: person_det
-  extra: {}               # any extra kwargs forwarded to rfdetr's model.train()
+  output_dir: runs/rfdetr/rfdetr_nano_person
+  run_name: rfdetr_nano_person
+  extra:
+    early_stopping_patience: 50   # match YOLO's patience: 50
 
 wandb:
   enabled: true

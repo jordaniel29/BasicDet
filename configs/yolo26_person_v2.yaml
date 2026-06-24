@@ -1,11 +1,11 @@
-# YOLO26 person-detection fine-tuning experiment.
-# Every value here is loaded into a typed YOLOExperimentConfig (basicdet/config.py).
+# YOLO26n fine-tuning on the persondet_v2.1 dataset.
+# Mirrors configs/yolo26_person.yaml (v1.1); only the dataset, run name, and
+# W&B run differ — so v1 and v2 results stay separate and comparable.
 
-family: yolo            # selects the YOLO pipeline (see scripts/train.py)
+family: yolo            # selects the YOLO pipeline (see basicdet/train.py)
 
 data:
-  # Ultralytics dataset config shipped with the combined dataset.
-  yaml_path: assets/data/persondet_v1.1/data.yaml
+  yaml_path: assets/data/persondet_v2.1/data.yaml
 
 model:
   # YOLO26 variants: yolo26n / yolo26s / yolo26m / yolo26l / yolo26x (.pt).
@@ -22,10 +22,10 @@ train:
   seed: 42
   device: auto         # auto | cpu | "0" | "0,1"
   fraction: 1.0        # fraction of train set; lower (e.g. 0.02) for quick smoke runs
-  cache: ram           # cache decoded images in RAM (~40GB) — fixes the data-loading bottleneck
+  cache: ram           # cache decoded images in RAM — fixes the data-loading bottleneck
   deterministic: false # enable cuDNN autotuning for speed
   project: yolo26        # runs land in runs/detect/<project>/<name>
-  name: yolo26n_person
+  name: yolo26n_person_v2
 
 wandb:
   enabled: true

@@ -20,7 +20,7 @@ from typing import Any
 import numpy as np
 import supervision as sv
 from PIL import Image
-from rfdetr import RFDETRBase, RFDETRLarge
+from rfdetr import RFDETRBase, RFDETRLarge, RFDETRMedium, RFDETRNano, RFDETRSmall
 
 from basicdet.metrics.coco import PredictFn, evaluate_coco
 from basicdet.utils.config import RFDETRExperimentConfig
@@ -30,6 +30,15 @@ logger = logging.getLogger(__name__)
 
 # RF-DETR uses "valid" (not "val") for its COCO validation subfolder.
 _SPLIT_DIRS = {"train": "train", "val": "valid", "test": "test"}
+
+# Config variant name -> RF-DETR model class.
+_VARIANTS = {
+    "nano": RFDETRNano,
+    "small": RFDETRSmall,
+    "medium": RFDETRMedium,
+    "base": RFDETRBase,
+    "large": RFDETRLarge,
+}
 
 # COCO mAP needs a low confidence floor so recall isn't truncated.
 _DEFAULT_EVAL_CONF = 0.05
@@ -52,7 +61,7 @@ def build_model(config: RFDETRExperimentConfig) -> Any:
     if config.model.num_classes is not None:
         kwargs["num_classes"] = config.model.num_classes
 
-    model_cls = RFDETRLarge if config.model.variant == "large" else RFDETRBase
+    model_cls = _VARIANTS[config.model.variant]
     logger.info("Building RF-DETR (%s) with %s", config.model.variant, kwargs or "defaults")
     return model_cls(**kwargs)
 
@@ -70,7 +79,7 @@ def load_model(config: RFDETRExperimentConfig, weights: str) -> Any:
     kwargs: dict[str, Any] = {"pretrain_weights": weights}
     if config.model.resolution is not None:
         kwargs["resolution"] = config.model.resolution
-    model_cls = RFDETRLarge if config.model.variant == "large" else RFDETRBase
+    model_cls = _VARIANTS[config.model.variant]
     return model_cls(**kwargs)
 
 

@@ -57,7 +57,11 @@ class TrainConfig(BaseModel):
             string such as ``"0"`` or ``"0,1"``.
         fraction: Fraction of the train set to use, in (0, 1]. ``1.0`` is the
             full dataset; lower values give fast smoke/debug runs.
-        deterministic: Force deterministic algorithms (reproducible but slower).
+        cache: Image caching to avoid re-decoding JPEGs every epoch — ``"ram"``
+            (fastest, needs RAM), ``"disk"`` (cached .npy), or ``False`` (off).
+            Big speedup when training is data-loading bound.
+        deterministic: Force deterministic algorithms (reproducible but slower);
+            ``False`` enables cuDNN autotuning for speed.
         project: Ultralytics project label. Runs are written to
             ``runs/detect/<project>/<name>`` (Ultralytics prepends its
             ``runs_dir/detect``), so use a plain label, not a path.
@@ -73,6 +77,7 @@ class TrainConfig(BaseModel):
     seed: int = 42
     device: str = "auto"
     fraction: float = 1.0
+    cache: bool | str = False
     deterministic: bool = True
     project: str = "yolo26"
     name: str = "basicdet"
@@ -134,14 +139,15 @@ class RFDETRModelConfig(BaseModel):
     """Model variant and construction settings.
 
     Attributes:
-        variant: ``"base"`` (RFDETRBase) or ``"large"`` (RFDETRLarge).
+        variant: Model size — ``nano`` / ``small`` / ``medium`` / ``base`` /
+            ``large`` (smaller = faster, less accurate).
         resolution: Square input resolution in pixels; must be divisible by 56.
             ``None`` uses the variant's default.
         num_classes: Number of classes. ``None`` lets RF-DETR infer from the
             dataset (correct for this single-class ``person`` set).
     """
 
-    variant: Literal["base", "large"] = "base"
+    variant: Literal["nano", "small", "medium", "base", "large"] = "base"
     resolution: int | None = None
     num_classes: int | None = None
 

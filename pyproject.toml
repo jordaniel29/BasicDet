@@ -55,10 +55,18 @@ module = [
     "torch.*",
     "numpy.*",
     "ultralytics.*",
-    "wandb.*",
     "rfdetr.*",
     "supervision.*",
     "pycocotools.*",
     "PIL.*",
 ]
 ignore_missing_imports = true
+
+# wandb ships an incomplete py.typed whose top-level API (init/log/Artifact/...)
+# is exported dynamically — mypy flags it as "no attribute" when wandb isn't
+# importable (e.g. pre-commit's isolated env). Skip following it -> treat as Any
+# everywhere, so type-checking doesn't depend on whether wandb is installed.
+[[tool.mypy.overrides]]
+module = ["wandb", "wandb.*"]
+ignore_missing_imports = true
+follow_imports = "skip"

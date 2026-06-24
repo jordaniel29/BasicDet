@@ -66,6 +66,7 @@ def train(config: YOLOExperimentConfig) -> Any:
         patience=config.train.patience,
         workers=config.train.workers,
         fraction=config.train.fraction,
+        cache=config.train.cache,
         seed=config.train.seed,
         deterministic=config.train.deterministic,
         device=device,
