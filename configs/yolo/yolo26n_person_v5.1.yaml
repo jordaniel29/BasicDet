@@ -1,11 +1,11 @@
-# YOLO26n fine-tuning on the persondet_v2.1 dataset.
-# Mirrors configs/yolo26_person.yaml (v1.1); only the dataset, run name, and
-# W&B run differ — so v1 and v2 results stay separate and comparable.
+# YOLO26-L fine-tuning on the persondet_v2.1 dataset.
+# Same setup as configs/yolo/yolo26n_person_v2.yaml (nano); only the model weights and
+# run name differ — so the nano vs large results stay separate and comparable.
 
 family: yolo            # selects the YOLO pipeline (see basicdet/train.py)
 
 data:
-  yaml_path: assets/data/persondet_v2.1/data.yaml
+  yaml_path: assets/data/persondet_v5.1/data.yaml
 
 model:
   # YOLO26 variants: yolo26n / yolo26s / yolo26m / yolo26l / yolo26x (.pt).
@@ -14,7 +14,7 @@ model:
 
 train:
   epochs: 100
-  batch: 64            # GPU has 96GB; nano barely uses it — large batch is fine
+  batch: 64            # L is ~10x nano; 96GB VRAM still handles batch 64 at 640px
   optimizer: auto
   lr0: 0.01
   patience: 50         # early-stop after N epochs without val improvement
@@ -25,7 +25,7 @@ train:
   cache: ram           # cache decoded images in RAM — fixes the data-loading bottleneck
   deterministic: false # enable cuDNN autotuning for speed
   project: yolo26        # runs land in runs/detect/<project>/<name>
-  name: yolo26n_person_v2
+  name: yolo26n_person_v5.1
 
 wandb:
   enabled: true
