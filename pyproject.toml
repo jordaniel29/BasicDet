@@ -59,6 +59,8 @@ module = [
     "supervision.*",
     "pycocotools.*",
     "PIL.*",
+    "tqdm",
+    "cv2",
 ]
 ignore_missing_imports = true
 
