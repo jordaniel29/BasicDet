@@ -198,6 +198,179 @@ class RFDETRExperimentConfig(BaseModel):
     wandb: WandbConfig = Field(default_factory=WandbConfig)
 
 
+# --------------------------------------------------------------------------- #
+# ReID (person re-identification embedders for the downstream TRACE tracker)
+#
+# ReID consumes identity-labelled person crops in the Market-1501 directory
+# layout (``bounding_box_train/``, ``query/``, ``bounding_box_test/``; filenames
+# ``<pid>_c<camid>_...jpg``), not detection boxes. Two families:
+#   - ``reid_ftnet``:    layumi ft_net (ResNet-50 + bottleneck head) trained
+#                        natively here; checkpoint drops into TRACE's
+#                        ``piapf/reid/ftnet_reid.py`` loader unchanged.
+#   - ``reid_clipreid``: orchestrates the official CLIP-ReID two-stage trainer
+#                        (third_party checkout); the output ``.pth`` is consumed
+#                        verbatim by TRACE's ``piaspace_clip_reid`` package.
+# --------------------------------------------------------------------------- #
+
+
+class ReIDDataConfig(BaseModel):
+    """Dataset location for ReID (Market-1501 directory layout).
+
+    Attributes:
+        dataset_dir: Directory containing ``bounding_box_train/``, ``query/``
+            and ``bounding_box_test/`` folders of identity-labelled crops named
+            ``<pid>_c<camid>_<...>.jpg``.
+    """
+
+    dataset_dir: Path
+
+
+class FtNetModelConfig(BaseModel):
+    """ft_net architecture settings — MUST match the TRACE inference config.
+
+    Attributes:
+        linear_num: Bottleneck feature dim (``0`` = use the raw 2048-d pooled
+            feature). TRACE's ``ftnet_reid.py`` default is 512.
+        stride: Stride of the last ResNet block (``1`` = denser map, BoT trick).
+            TRACE's default is 2.
+        droprate: Dropout after the bottleneck BN during training (parameter-free
+            at inference; does not affect checkpoint compatibility).
+        imagenet_init: Start from ImageNet-pretrained ResNet-50 (standard).
+        input_size: Crop input size ``[H, W]`` — must match TRACE inference
+            (256x128).
+    """
+
+    linear_num: int = 512
+    stride: int = 2
+    droprate: float = 0.5
+    imagenet_init: bool = True
+    input_size: tuple[int, int] = (256, 128)
+
+
+class ReIDTrainConfig(BaseModel):
+    """ReID training-loop hyperparameters (ft_net native trainer).
+
+    Attributes:
+        epochs: Training epochs (layumi baseline: 60).
+        batch: Crops per batch.
+        lr: Learning rate for NEW parameters (bottleneck + classifier); the
+            pretrained backbone uses ``lr * backbone_lr_scale``.
+        backbone_lr_scale: Backbone LR multiplier (layumi baseline: 0.1).
+        weight_decay: SGD weight decay.
+        label_smoothing: Cross-entropy label smoothing.
+        step_lr_epochs: Decay LR by ``step_lr_gamma`` every N epochs.
+        step_lr_gamma: LR decay factor.
+        warmup_epochs: Linear LR warm-up epochs.
+        random_erasing: Random-erasing probability (0 disables).
+        workers: Dataloader worker processes.
+        seed: Global RNG seed.
+        device: ``"auto"``, ``"cpu"``, or a CUDA index string.
+        name: Run name; outputs land in ``runs/reid/<name>/``.
+    """
+
+    epochs: int = 60
+    batch: int = 32
+    lr: float = 0.05
+    backbone_lr_scale: float = 0.1
+    weight_decay: float = 5e-4
+    label_smoothing: float = 0.1
+    step_lr_epochs: int = 20
+    step_lr_gamma: float = 0.1
+    warmup_epochs: int = 5
+    random_erasing: float = 0.5
+    workers: int = 8
+    seed: int = 42
+    device: str = "auto"
+    name: str = "ftnet_person"
+
+
+class FtNetExperimentConfig(BaseModel):
+    """Full configuration for an ft_net ReID fine-tune.
+
+    Attributes:
+        family: Discriminator selecting the ft_net pipeline.
+    """
+
+    family: Literal["reid_ftnet"] = "reid_ftnet"
+    data: ReIDDataConfig
+    model: FtNetModelConfig = Field(default_factory=FtNetModelConfig)
+    train: ReIDTrainConfig = Field(default_factory=ReIDTrainConfig)
+    wandb: WandbConfig = Field(default_factory=WandbConfig)
+
+
+class ClipReIDModelConfig(BaseModel):
+    """CLIP-ReID architecture settings — must match the deployed TRT encoder.
+
+    Attributes:
+        backbone: CLIP vision backbone (deployed engine is ViT-B-16).
+        stride: Patch-embedding stride (deployed engine: 12 — overlapping
+            patches).
+        sie_camera: Enable Side Information Embeddings over camera ids during
+            training (the deployed ``12x12sie`` checkpoints used this;
+            inference ignores SIE).
+        input_size: Crop input size ``[H, W]`` (deployed engine: 256x128).
+    """
+
+    backbone: Literal["ViT-B-16"] = "ViT-B-16"
+    stride: int = 12
+    sie_camera: bool = True
+    input_size: tuple[int, int] = (256, 128)
+
+
+class ClipReIDTrainConfig(BaseModel):
+    """CLIP-ReID two-stage training settings (forwarded to the official repo).
+
+    Attributes:
+        stage1_epochs: Prompt-learning stage epochs (official person cfg: 120
+            iterations-based; see repo configs).
+        stage2_epochs: Image-encoder fine-tune epochs (official: 60).
+        batch: Stage-2 batch size (P*K sampler; official person cfg: 64).
+        num_instances: Crops per identity in a batch (K of the PK sampler).
+        base_lr_stage2: Stage-2 base learning rate.
+        pretrain_weights: Starting checkpoint — path to a CLIP-ReID ``.pth``
+            (e.g. the deployed MSMT17 one, to fine-tune from it) or ``null`` to
+            start from OpenAI CLIP weights as in the official recipe.
+        workers: Dataloader worker processes.
+        seed: Global RNG seed.
+        device: ``"auto"``, ``"cpu"``, or a CUDA index string.
+        name: Run name; outputs land in ``runs/reid/<name>/``.
+        piaspace_pkg: Path to TRACE's ``piaspace-clip-reid`` package ``src/``
+            dir — evaluation embeds through the DEPLOYED encoder so every eval
+            doubles as a deployment-contract test.
+        extra: Extra ``KEY: value`` overrides merged verbatim onto the official
+            repo's yacs config (dotted keys, e.g. ``SOLVER.STAGE2.IMS_PER_BATCH``).
+    """
+
+    stage1_epochs: int = 120
+    stage2_epochs: int = 60
+    batch: int = 64
+    num_instances: int = 4
+    base_lr_stage2: float = 5e-6
+    pretrain_weights: Path | None = None
+    workers: int = 8
+    seed: int = 42
+    device: str = "auto"
+    name: str = "clipreid_person"
+    piaspace_pkg: Path = Path(
+        "/home/jordan/jordan/TRACE_SSAVE-AI-MVP/packages/piaspace-clip-reid/src"
+    )
+    extra: dict[str, Any] = Field(default_factory=dict)
+
+
+class ClipReIDExperimentConfig(BaseModel):
+    """Full configuration for a CLIP-ReID fine-tune.
+
+    Attributes:
+        family: Discriminator selecting the CLIP-ReID pipeline.
+    """
+
+    family: Literal["reid_clipreid"] = "reid_clipreid"
+    data: ReIDDataConfig
+    model: ClipReIDModelConfig = Field(default_factory=ClipReIDModelConfig)
+    train: ClipReIDTrainConfig = Field(default_factory=ClipReIDTrainConfig)
+    wandb: WandbConfig = Field(default_factory=WandbConfig)
+
+
 def _load_yaml(path: Path, schema: type[_ConfigT]) -> _ConfigT:
     """Load and validate a YAML file against a Pydantic schema.
 
@@ -230,25 +403,22 @@ def load_rfdetr_config(path: Path) -> RFDETRExperimentConfig:
 
 # Tagged union: the ``family`` field selects which schema validates the YAML,
 # so a single entrypoint can load either model's config (BasicSR-style dispatch).
-AnyExperimentConfig = Annotated[
-    YOLOExperimentConfig | RFDETRExperimentConfig,
-    Field(discriminator="family"),
-]
-_EXPERIMENT_ADAPTER: TypeAdapter[YOLOExperimentConfig | RFDETRExperimentConfig] = TypeAdapter(
-    AnyExperimentConfig
+AnyExperiment = (
+    YOLOExperimentConfig | RFDETRExperimentConfig | FtNetExperimentConfig | ClipReIDExperimentConfig
 )
+AnyExperimentConfig = Annotated[AnyExperiment, Field(discriminator="family")]
+_EXPERIMENT_ADAPTER: TypeAdapter[AnyExperiment] = TypeAdapter(AnyExperimentConfig)
 
 
-def load_experiment(path: Path) -> YOLOExperimentConfig | RFDETRExperimentConfig:
+def load_experiment(path: Path) -> AnyExperiment:
     """Load any experiment config, dispatching on its ``family`` field.
 
     Args:
         path: Path to the YAML config. Must contain a top-level ``family`` key
-            (``yolo`` or ``rfdetr``).
+            (``yolo`` / ``rfdetr`` / ``reid_ftnet`` / ``reid_clipreid``).
 
     Returns:
-        The validated config — a :class:`YOLOExperimentConfig` or
-        :class:`RFDETRExperimentConfig` depending on ``family``.
+        The validated config for the matching family.
 
     Raises:
         FileNotFoundError: If ``path`` does not exist.

@@ -1,0 +1,37 @@
+# CLIP-ReID (official two-stage recipe) fine-tune on the atustc9 ReID crops.
+# Architecture pinned to the DEPLOYED engine: ViT-B/16, overlapping patches
+# stride 12, SIE camera embeddings, 256x128 ("12x12sie"). Output .pth is
+# consumed verbatim by TRACE piaspace_clip_reid and converts to TRT with
+# scripts/conversion/convert_clipreid_to_trt.sh person --weights <path>.
+#
+# Dataset built by: python -m curation.build_atustc9_reid
+#   (Market-1501 layout, identity-disjoint split: 220 train ids / 95.5k crops,
+#    50 held-out ids -> 540 query + 20.9k gallery, 16 cameras).
+
+family: reid_clipreid
+
+data:
+  dataset_dir: assets/data/persondet_reid_atustc9   # built by curation/build_atustc9_reid.py
+
+model:
+  backbone: ViT-B-16
+  stride: 12
+  sie_camera: true       # 16 atustc9 cameras -> SIE camera embeddings
+  input_size: [256, 128]
+
+train:
+  stage1_epochs: 120
+  stage2_epochs: 60
+  batch: 64
+  num_instances: 4       # K of the PK identity sampler (16 ids x 4 crops/batch)
+  base_lr_stage2: 5.0e-6
+  pretrain_weights: null # official recipe starts from OpenAI CLIP weights
+  workers: 8
+  seed: 42
+  device: "1"            # GPU 1 (exported as CUDA_VISIBLE_DEVICES in the subprocess)
+  name: clipreid_person_atustc9
+  piaspace_pkg: /home/jordan/jordan/TRACE_SSAVE-AI-MVP/packages/piaspace-clip-reid/src
+
+wandb:
+  enabled: false         # the official trainer logs to file; W&B not wired
+  project: person-det

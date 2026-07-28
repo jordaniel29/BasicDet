@@ -12,9 +12,16 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
-from basicdet.utils.config import RFDETRExperimentConfig, YOLOExperimentConfig
+from basicdet.utils.config import (
+    ClipReIDExperimentConfig,
+    FtNetExperimentConfig,
+    RFDETRExperimentConfig,
+    YOLOExperimentConfig,
+)
 
-AnyConfig = YOLOExperimentConfig | RFDETRExperimentConfig
+AnyConfig = (
+    YOLOExperimentConfig | RFDETRExperimentConfig | FtNetExperimentConfig | ClipReIDExperimentConfig
+)
 
 
 def _model(family: str) -> ModuleType:
@@ -27,6 +34,14 @@ def _model(family: str) -> ModuleType:
         from basicdet.models import rfdetr
 
         return rfdetr
+    if family == "reid_ftnet":
+        from basicdet.models import reid_ftnet
+
+        return reid_ftnet
+    if family == "reid_clipreid":
+        from basicdet.models import reid_clipreid
+
+        return reid_clipreid
     raise ValueError(f"Unknown model family: {family!r}")
 
 

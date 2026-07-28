@@ -1,0 +1,35 @@
+# ft_net (layumi ResNet-50 baseline) fine-tune on the MTMDC ReID crops.
+# Checkpoint drops unchanged into TRACE piapf/reid/ftnet_reid.py — keep
+# model.stride / model.linear_num equal to the TRACE-side ftnet config.
+
+family: reid_ftnet
+
+data:
+  dataset_dir: assets/data/persondet_reid_v1   # Market-1501 layout (built Monday)
+
+model:
+  linear_num: 512        # = TRACE ftnet_reid default (bottleneck feature dim)
+  stride: 2              # = TRACE ftnet_reid default
+  droprate: 0.5
+  imagenet_init: true
+  input_size: [256, 128]  # = TRACE inference input
+
+train:
+  epochs: 60
+  batch: 32
+  lr: 0.05
+  backbone_lr_scale: 0.1
+  label_smoothing: 0.1
+  step_lr_epochs: 20
+  warmup_epochs: 5
+  random_erasing: 0.5
+  workers: 8
+  seed: 42
+  device: auto            # GPU pinned at launch: CUDA_VISIBLE_DEVICES=1
+  name: ftnet_person_v1
+
+wandb:
+  enabled: true
+  project: person-det
+  entity: null
+  log_model: false

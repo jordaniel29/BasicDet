@@ -184,10 +184,16 @@ basicdet/train.py` because it's pip-installed). The config's `family` field
 model by adding a `models/<x>.py` (exposing `train`/`evaluate`/`predict`) and one
 branch in the registry.
 
-**Scope boundaries:** fine-tuning + **detection** evaluation only. **Tracking/MOT
-benchmarking** (BoT-SORT + HOTA/MOTA/IDF1 on MOT17/SportsMOT/etc.) is run in a
-separate downstream repo (`~/jordan/boxmot`), **not here**. No deployment code
-(TensorRT/ONNX serving export, inference-time quantization, serving frameworks).
+**Scope boundaries:** fine-tuning + evaluation of the **perception models feeding the
+TRACE tracker**: person **detection** (YOLO26, RF-DETR) and person **ReID embedders**
+(`reid_ftnet`, `reid_clipreid` families; ReID checkpoints must stay drop-in compatible
+with TRACE's `piapf/reid/` loaders — see the module docstrings). ReID intrinsic eval
+(mAP/CMC on query–gallery) lives here; **tracking/MOT benchmarking** (BoT-SORT +
+HOTA/MOTA/IDF1) is run downstream (`~/jordan/boxmot`, TRACE), **not here**. No
+deployment code (TensorRT/ONNX serving export, inference-time quantization, serving
+frameworks) — engine conversion happens in the TRACE repo. The official CLIP-ReID
+trainer is vendored at `third_party/CLIP-ReID` (gitignored; clone command + pinned
+commit in `basicdet/models/reid_clipreid.py`).
 
 ### ML-specific conventions
 
