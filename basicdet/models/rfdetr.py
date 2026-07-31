@@ -23,6 +23,7 @@ from PIL import Image
 from rfdetr import RFDETRBase, RFDETRLarge, RFDETRMedium, RFDETRNano, RFDETRSmall
 
 from basicdet.metrics.coco import PredictFn, evaluate_coco
+from basicdet.utils import tracking
 from basicdet.utils.config import RFDETRExperimentConfig
 from basicdet.utils.seed import set_seed
 
@@ -116,8 +117,12 @@ def train(config: RFDETRExperimentConfig) -> None:
 
     set_seed(config.train.seed)
 
+    # Falls back to False when W&B is enabled but unauthenticated, so an
+    # unattended run never stalls on the interactive login prompt.
+    wandb_enabled = tracking.resolve_wandb_enabled(config.wandb)
+
     # RF-DETR reads the W&B entity from the environment rather than a kwarg.
-    if config.wandb.enabled and config.wandb.entity:
+    if wandb_enabled and config.wandb.entity:
         os.environ.setdefault("WANDB_ENTITY", config.wandb.entity)
 
     model = build_model(config)
@@ -139,7 +144,7 @@ def train(config: RFDETRExperimentConfig) -> None:
         early_stopping=config.train.early_stopping,
         output_dir=config.train.output_dir,
         tensorboard=config.train.tensorboard,
-        wandb=config.wandb.enabled,
+        wandb=wandb_enabled,
         project=config.wandb.project,
         run=config.train.run_name,
         **config.train.extra,

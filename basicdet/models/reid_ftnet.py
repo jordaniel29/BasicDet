@@ -32,6 +32,7 @@ from basicdet.models.reid_data import (
     extract_features,
     load_market_dataset,
 )
+from basicdet.utils import tracking
 from basicdet.utils.config import FtNetExperimentConfig
 from basicdet.utils.seed import set_seed
 
@@ -181,7 +182,7 @@ def train(config: FtNetExperimentConfig) -> Path:
     )
     criterion = nn.CrossEntropyLoss(label_smoothing=config.train.label_smoothing)
 
-    use_wandb = config.wandb.enabled
+    use_wandb = tracking.resolve_wandb_enabled(config.wandb)
     if use_wandb:
         import wandb
 

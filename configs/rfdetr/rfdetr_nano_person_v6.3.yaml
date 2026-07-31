@@ -1,0 +1,53 @@
+# RF-DETR person-detection fine-tuning experiment.
+# Loaded into a typed RFDETRExperimentConfig (basicdet/config.py).
+#
+# Hyperparameters are aligned with configs/yolo/yolo26n_person_v6.3.yaml (epochs 100,
+# workers 16, seed 42, early-stop patience 50) for a fair comparison, with two
+# deliberate divergences:
+#   - learning rate: RF-DETR is a DETR transformer and needs a low AdamW LR (~1e-4);
+#     YOLO's 0.01 would diverge.
+#   - batch size: 32 vs YOLO's 64 — RF-DETR's loss is the memory bottleneck, not the
+#     network (see the batch_size note below).
+
+family: rfdetr          # selects the RF-DETR pipeline (see basicdet/train.py)
+
+data:
+  # COCO-layout dir with train/ valid/ test/, each + an _annotations.coco.json.
+  dataset_dir: assets/data/persondet_v6.3/rfdetr
+
+model:
+  variant: nano           # nano | small | medium | base | large
+  resolution: null        # null = variant default; if set, must be divisible by 56
+  num_classes: null       # null = infer from dataset (correct for single-class person)
+
+train:
+  epochs: 100             # match YOLO
+  batch_size: 32          # DO NOT RAISE on the 80GB H100. bs=64 OOM'd at epoch 2 in
+                          # criterion.loss_boxes -> generalized_box_iou: the [N,M,2] query x
+                          # ground-truth cost matrix scales with boxes-per-image, which on a
+                          # crowd dataset spikes unpredictably. Peak VRAM is therefore NOT a
+                          # smooth function of batch size. bs=32 starts near 25GB but climbs
+                          # to ~58GB/80GB by epoch 2 as the allocator hits the denser batches,
+                          # so the real steady-state headroom is ~23GB, not the ~55GB the
+                          # first-epoch reading suggests.
+  grad_accum_steps: 1     # effective batch = 32
+  lr: 0.0001              # DETR-appropriate; intentionally NOT YOLO's 0.01 (see header)
+  num_workers: 16         # Raised from 8 on a (wrong) dataloader-bound theory; it made no
+                          # measurable difference. The pipeline supplies ~821 img/s (NFS
+                          # 1983 img/s, decode+resize 51 img/s/core x 16) against ~26 img/s
+                          # consumed — ~30x headroom. The GPU sits at ~30% util because the
+                          # criterion dominates the step (measured: network 88ms, matcher
+                          # 23ms, of a ~1090ms step), not because input starves it.
+  seed: 42                # match YOLO
+  early_stopping: true
+  tensorboard: false
+  output_dir: runs/rfdetr/rfdetr_nano_person
+  run_name: rfdetr_nano_person
+  extra:
+    early_stopping_patience: 50   # match YOLO's patience: 50
+
+wandb:
+  enabled: true
+  project: person-det
+  entity: null            # null = your default W&B entity
+  log_model: true

@@ -1,0 +1,61 @@
+# RF-DETR LARGE person-detection fine-tuning on persondet_v6.3.
+# Loaded into a typed RFDETRExperimentConfig (basicdet/config.py).
+#
+# Companion to configs/rfdetr/rfdetr_nano_person_v6.3.yaml: same dataset, epochs,
+# LR, workers, seed, patience and EFFECTIVE batch (32), so nano-vs-large is a clean
+# capacity comparison. Only the memory/throughput settings differ, because "large"
+# is mostly a resolution and decoder-depth change rather than a parameter-count one:
+#
+#            params   resolution   dec_layers   loss levels (main + aux + enc)
+#   nano     30.5M       384           2                  3
+#   large    33.9M       704           4                  5
+#
+# 3.4x the pixels and 1.7x the loss levels -> the physical batch has to drop 4x.
+
+family: rfdetr          # selects the RF-DETR pipeline (see basicdet/train.py)
+
+data:
+  # COCO-layout dir with train/ valid/ test/, each + an _annotations.coco.json.
+  dataset_dir: assets/data/persondet_v6.3/rfdetr
+
+model:
+  variant: large          # nano | small | medium | base | large
+  resolution: null        # null = variant default (704); if set, must be divisible by 56
+  num_classes: null       # null = infer from dataset (correct for single-class person)
+
+train:
+  epochs: 100             # match nano v6.3 / YOLO. See the runtime warning at the bottom.
+  batch_size: 8           # Measured on the 80GB H100: the network alone peaks at 8.52GB
+                          # here (2.21GB at bs=2, 4.52GB at bs=4 — clean linear scaling,
+                          # ~1.07GB/sample at 704px). The network is NOT the constraint;
+                          # the criterion is. Projecting nano's measured criterion cost
+                          # (~1.4-2.1GB/sample) scaled by 5/3 loss levels puts bs=8 at
+                          # roughly 27-37GB total, leaving real headroom for the crowd-
+                          # density tail (max 377 boxes/image) that OOM'd the nano run at
+                          # bs=64. Raise this only with a measurement, never an estimate.
+  grad_accum_steps: 4     # effective batch = 8 x 4 = 32, matching nano v6.3
+  lr: 0.0001              # DETR-appropriate; intentionally NOT YOLO's 0.01
+  num_workers: 16         # matches nano v6.3. Note the input pipeline is NOT the
+                          # bottleneck (measured ~821 img/s supply vs ~26 img/s consumed
+                          # on nano) — this is set for parity, not for throughput.
+  seed: 42                # match nano v6.3 / YOLO
+  early_stopping: true
+  tensorboard: false
+  output_dir: runs/rfdetr/rfdetr_large_person_v6.3
+  run_name: rfdetr_large_person_v6.3
+  extra:
+    early_stopping_patience: 50   # match nano v6.3 / YOLO
+
+wandb:
+  enabled: true
+  project: person-det
+  entity: null            # null = your default W&B entity
+  log_model: true
+
+# RUNTIME WARNING — measured network step at bs=8/704px is 68.8ms; adding the
+# projected criterion cost gives ~486ms/step x 8,942 steps = ~1.2 h/epoch, so
+# epochs: 100 is roughly a FIVE DAY run. The nano's mAP had flattened by epoch ~50
+# (0.5780 @45 -> 0.5821 @53, then oscillating), so 50-60 epochs likely buys the same
+# result in half the time. Also note patience: 50 cannot fire before epoch 100 unless
+# progress stalls for 36+ hours — it did not save the nano run when that diverged to
+# NaN at epoch 58 and burned 25 dead epochs. Watch val mAP, don't rely on early stop.

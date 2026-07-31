@@ -44,7 +44,7 @@ def train(config: YOLOExperimentConfig) -> Any:
 
     model = YOLO(config.model.weights)
 
-    if config.wandb.enabled:
+    if tracking.resolve_wandb_enabled(config.wandb):
         tracking.init_wandb(config)
         tracking.register_callbacks(model, config)
 

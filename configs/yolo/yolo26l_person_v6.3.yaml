@@ -1,15 +1,15 @@
-# YOLO26-L fine-tuning on the persondet_v2.1 dataset.
-# Same setup as configs/yolo/yolo26n_person_v2.yaml (nano); only the model weights and
-# run name differ — so the nano vs large results stay separate and comparable.
+# YOLO26-N fine-tuning on persondet_v6.2 (= v6.1 with MTMDC labels realigned to the
+# correct 23fps annotation timeline — the 30fps cameras were offset by x30/23; see
+# curation/realign_mtmdc_timeline.py, 2026-07-03 discovery). Recipe identical to v5.x/v6.1.
 
 family: yolo            # selects the YOLO pipeline (see basicdet/train.py)
 
 data:
-  yaml_path: assets/data/persondet_v5.1/data.yaml
+  yaml_path: assets/data/persondet_v6.3/data.yaml
 
 model:
   # YOLO26 variants: yolo26n / yolo26s / yolo26m / yolo26l / yolo26x (.pt).
-  weights: yolo26n.pt
+  weights: yolo26l.pt
   imgsz: 640
 
 train:
@@ -25,7 +25,7 @@ train:
   cache: ram           # cache decoded images in RAM — fixes the data-loading bottleneck
   deterministic: false # enable cuDNN autotuning for speed
   project: yolo26        # runs land in runs/detect/<project>/<name>
-  name: yolo26n_person_v5.1
+  name: yolo26n_person_v6.3
 
 wandb:
   enabled: true
