@@ -16,6 +16,10 @@ dependencies = [
     "supervision>=0.22",
     "pycocotools>=2.0",
     "pillow>=10.0",
+    # PersonViT's backbone is a stock timm VisionTransformer — the same class
+    # TRACE's adapter rebuilds it with, which is what keeps the checkpoint
+    # loadable there (basicdet/models/reid_personvit.py).
+    "timm>=1.0",
     "pydantic>=2.7",
     "pyyaml>=6.0",
     "wandb>=0.17",
@@ -59,6 +63,7 @@ module = [
     "supervision.*",
     "pycocotools.*",
     "PIL.*",
+    "timm.*",
     "tqdm",
     "cv2",
 ]

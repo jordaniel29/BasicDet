@@ -42,6 +42,7 @@ import yaml
 from basicdet.metrics.reid import evaluate_retrieval
 from basicdet.models.reid_data import ReIDSplit, load_market_dataset
 from basicdet.utils.config import ClipReIDExperimentConfig
+from basicdet.utils.runtime import resolve_torch_device
 
 logger = logging.getLogger(__name__)
 
@@ -292,16 +293,9 @@ def _deployed_embedder(config: ClipReIDExperimentConfig, weights: str) -> Any:
         sys.path.insert(0, str(pkg))
     from piaspace_clip_reid import CLIPReIDEmbedder
 
-    device = config.train.device
-    if device == "auto":
-        import torch
-
-        device = "cuda:0" if torch.cuda.is_available() else "cpu"
-    elif device.isdigit():
-        device = f"cuda:{device}"
     return CLIPReIDEmbedder(
         {
-            "device": device,
+            "device": resolve_torch_device(config.train.device),
             "input_size": list(config.model.input_size),
             "stride": config.model.stride,
             "weights_path": weights,

@@ -1,4 +1,4 @@
-"""Shared ReID data utilities — Market-1501 layout, crop dataset, transforms.
+"""Shared ReID data utilities — Market-1501 layout, crop dataset, transforms, P x K sampler.
 
 The curated ReID sets (``assets/data/persondet_reid_v*``) use the Market-1501
 directory layout so both the native ft_net trainer and the official CLIP-ReID
@@ -17,15 +17,17 @@ Filenames encode identity and camera: ``<pid>_c<camid>[s<seq>]_<...>.jpg``
 from __future__ import annotations
 
 import logging
+import random
 import re
-from collections.abc import Callable
+from collections import defaultdict
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 import torch
 from PIL import Image
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, Sampler
 from torchvision import transforms
 
 logger = logging.getLogger(__name__)
@@ -191,11 +193,85 @@ def build_test_transform(input_size: tuple[int, int]) -> Callable:
     )
 
 
+class RandomIdentitySampler(Sampler[int]):
+    """P x K sampler: P identities per batch, K crops each (batch = P * K).
+
+    Required by any metric-learning recipe with a batch-hard triplet loss — the
+    loss needs several crops of the same identity *in the batch* to mine a
+    positive from. Replicates the sampler of the reid-strong-baseline /
+    TransReID lineage (Luo et al., "Bag of Tricks and a Strong Baseline for
+    Deep Person Re-identification", CVPRW 2019;
+    https://github.com/damo-cv/TransReID/blob/main/datasets/sampler.py):
+    identities with fewer than K crops are oversampled with replacement, and
+    each epoch ends when fewer than P identities still hold an unused chunk.
+
+    Args:
+        split: The training split (contiguous pids, junk already dropped).
+        batch_size: P * K — must be divisible by ``num_instances``.
+        num_instances: K, crops per identity in a batch.
+
+    Raises:
+        ValueError: If ``batch_size`` is not a multiple of ``num_instances``,
+            or the split holds fewer than P identities.
+    """
+
+    def __init__(self, split: ReIDSplit, batch_size: int, num_instances: int) -> None:
+        if batch_size % num_instances != 0:
+            raise ValueError(
+                f"batch_size ({batch_size}) must be a multiple of num_instances "
+                f"({num_instances}) for a P x K sampler"
+            )
+        self.num_instances = num_instances
+        self.num_pids_per_batch = batch_size // num_instances
+
+        self.index_per_pid: dict[int, list[int]] = defaultdict(list)
+        for index, pid in enumerate(split.pids):
+            self.index_per_pid[int(pid)].append(index)
+        if len(self.index_per_pid) < self.num_pids_per_batch:
+            raise ValueError(
+                f"batch_size {batch_size} / num_instances {num_instances} needs "
+                f"{self.num_pids_per_batch} identities per batch but the split has "
+                f"{len(self.index_per_pid)} — lower batch_size or raise num_instances"
+            )
+
+        # Epoch length: whole K-chunks per identity (short identities count as one).
+        self.length = sum(
+            max(len(idxs), num_instances) - max(len(idxs), num_instances) % num_instances
+            for idxs in self.index_per_pid.values()
+        )
+
+    def __len__(self) -> int:
+        return self.length
+
+    def __iter__(self) -> Iterator[int]:
+        chunks_per_pid: dict[int, list[list[int]]] = {}
+        for pid, idxs in self.index_per_pid.items():
+            pool = list(idxs)
+            if len(pool) < self.num_instances:
+                pool = random.choices(pool, k=self.num_instances)  # oversample short identities
+            random.shuffle(pool)
+            chunks = [
+                pool[i : i + self.num_instances]
+                for i in range(0, len(pool) - self.num_instances + 1, self.num_instances)
+            ]
+            if chunks:
+                chunks_per_pid[pid] = chunks
+
+        available = list(chunks_per_pid)
+        order: list[int] = []
+        while len(available) >= self.num_pids_per_batch:
+            for pid in random.sample(available, self.num_pids_per_batch):
+                order.extend(chunks_per_pid[pid].pop(0))
+                if not chunks_per_pid[pid]:
+                    available.remove(pid)
+        return iter(order)
+
+
 @torch.no_grad()
 def extract_features(
     model: torch.nn.Module,
     split: ReIDSplit,
-    input_size: tuple[int, int],
+    transform: Callable,
     device: str,
     batch_size: int = 64,
     workers: int = 4,
@@ -203,23 +279,26 @@ def extract_features(
 ) -> np.ndarray:
     """Embed a split with a torch model, mirroring TRACE inference behaviour.
 
-    Adds horizontally-flipped features when ``flip_tta`` (the ft_net runtime
-    default) and L2-normalises the result.
+    Adds horizontally-flipped features when ``flip_tta`` and L2-normalises the
+    result. Both are per-family deployment details — the transform is passed in
+    rather than built here because each family's preprocessing must mirror its
+    own TRACE-side adapter (ft_net: ImageNet stats; PersonViT: mean=std=0.5).
 
     Args:
         model: Feature extractor mapping ``[B, 3, H, W]`` to ``[B, dim]``.
         split: Crops to embed.
-        input_size: ``(H, W)`` model input resolution.
+        transform: Eval-time preprocessing applied to each PIL image.
         device: Torch device string.
         batch_size: Inference batch size.
         workers: Dataloader workers.
-        flip_tta: Add flipped-image features before normalisation.
+        flip_tta: Add flipped-image features before normalisation. Must match
+            what the deployed embedder does (ft_net: yes; PersonViT: no).
 
     Returns:
         ``[len(split), dim]`` float32 L2-normalised features.
     """
     loader = DataLoader(
-        CropDataset(split, build_test_transform(input_size)),
+        CropDataset(split, transform),
         batch_size=batch_size,
         num_workers=workers,
         shuffle=False,

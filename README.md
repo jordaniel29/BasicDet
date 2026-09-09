@@ -3,8 +3,9 @@
 Repo for fine-tuning and evaluating the models used for multi-camera tracking:
 
 - **Person detection** — YOLO26 (Ultralytics) and RF-DETR
-- **Person ReID embedders** — `reid_ftnet` (layumi ft_net) and `reid_clipreid`
-  (official CLIP-ReID two-stage recipe)
+- **Person ReID embedders** — `reid_ftnet` (layumi ft_net), `reid_clipreid`
+  (official CLIP-ReID two-stage recipe) and `reid_personvit` (PersonViT
+  ViT-B/16, TransReID fine-tune)
 
 One YAML fully describes a run; its `family` field selects the pipeline, so a
 single entry point works for every model. No hyperparameters live in the code.
@@ -39,6 +40,7 @@ The config's `family` key dispatches to the right pipeline:
 | `rfdetr` | RF-DETR detection | `configs/rfdetr/` |
 | `reid_ftnet` | ft_net ReID embedder | `configs/reid/` |
 | `reid_clipreid` | CLIP-ReID embedder | `configs/reid/` |
+| `reid_personvit` | PersonViT ReID embedder | `configs/reid/` |
 
 ## Layout
 

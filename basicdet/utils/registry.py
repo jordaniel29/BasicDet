@@ -15,12 +15,17 @@ from typing import Any
 from basicdet.utils.config import (
     ClipReIDExperimentConfig,
     FtNetExperimentConfig,
+    PersonViTExperimentConfig,
     RFDETRExperimentConfig,
     YOLOExperimentConfig,
 )
 
 AnyConfig = (
-    YOLOExperimentConfig | RFDETRExperimentConfig | FtNetExperimentConfig | ClipReIDExperimentConfig
+    YOLOExperimentConfig
+    | RFDETRExperimentConfig
+    | FtNetExperimentConfig
+    | ClipReIDExperimentConfig
+    | PersonViTExperimentConfig
 )
 
 
@@ -42,6 +47,10 @@ def _model(family: str) -> ModuleType:
         from basicdet.models import reid_clipreid
 
         return reid_clipreid
+    if family == "reid_personvit":
+        from basicdet.models import reid_personvit
+
+        return reid_personvit
     raise ValueError(f"Unknown model family: {family!r}")
 
 

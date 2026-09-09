@@ -1,0 +1,59 @@
+# PersonViT (ViT-B/16, LUPerson MIM pretraining + TransReID fine-tune) fine-tune
+# on the atustc9 ReID crops. Warm-started from the released MSMT17 checkpoint —
+# the exact weights TRACE deploys as `backend: personvit` and the winner of the
+# 2026-08-27 A/B (docs/report/2026-08-27-personvit-reid-ab.md in the TRACE repo:
+# AI-Hub 1-5 mean MTMC IDF1 0.859 vs 0.742 for CLIP-ReID).
+#
+# The output runs/reid/<name>/transformer_last.pth drops straight into TRACE:
+#   reid.person.personvit.weights_path: <path>   (neck_feat: after)
+#
+# Dataset built by: python -m curation.build_atustc9_reid
+#   (Market-1501 layout, identity-disjoint split: 220 train ids / 95.5k crops,
+#    50 held-out ids -> 540 query + 20.9k gallery, 16 cameras).
+#
+# Hyperparameters below are upstream's recipe for these checkpoints (SGD, base
+# LR 4e-4, 120 epochs, 20-epoch warm-up, ID + soft-margin triplet on a 16x4
+# P x K batch). Upstream ran it from MIM pretraining; starting from an already
+# ReID-tuned checkpoint is a much shorter journey, so if the run overfits (train
+# acc saturating while eval mAP stalls or drops) lower `lr` toward 1e-4 and cut
+# `epochs`/`warmup_epochs` together rather than tuning them apart.
+
+family: reid_personvit
+
+data:
+  dataset_dir: assets/data/persondet_reid_atustc9   # built by curation/build_atustc9_reid.py
+
+model:
+  # Released PersonViT ReID weights (https://huggingface.co/lakeAGI/PersonViTReID).
+  weights: ~/src/PersonViT/weights/msmt.vitb.lup.256x128.wopt.csk.4-8.ar.375.n8.e0260.transformer_120.pth
+  input_size: [256, 128]  # = the checkpoint's training resolution AND TRACE inference
+  neck_feat: after        # post-BNNeck: what TRACE deploys, so what we score
+  drop_path: 0.1
+
+train:
+  epochs: 120
+  batch: 64               # 16 identities x 4 crops (P x K sampler)
+  num_instances: 4        # K — batch-hard triplet mining needs >= 2
+  lr: 4.0e-4
+  bias_lr_factor: 2.0
+  weight_decay: 1.0e-4
+  weight_decay_bias: 1.0e-4
+  warmup_epochs: 20
+  id_loss_weight: 1.0
+  triplet_loss_weight: 1.0
+  triplet_margin: null    # soft-margin form (upstream MODEL.NO_MARGIN: True)
+  label_smoothing: 0.0    # upstream IF_LABELSMOOTH: off
+  random_erasing: 0.5
+  amp: true
+  eval_period: 20         # query/gallery mAP every 20 epochs (one embedding pass)
+  checkpoint_period: 20
+  workers: 8
+  seed: 42
+  device: "1"             # GPU 1 (GPU 0 is reserved)
+  name: personvit_person_atustc9
+
+wandb:
+  enabled: true
+  project: person-det
+  entity: null
+  log_model: false

@@ -210,6 +210,11 @@ class RFDETRExperimentConfig(BaseModel):
 #   - ``reid_clipreid``: orchestrates the official CLIP-ReID two-stage trainer
 #                        (third_party checkout); the output ``.pth`` is consumed
 #                        verbatim by TRACE's ``piaspace_clip_reid`` package.
+#   - ``reid_personvit``: PersonViT ViT-B/16 (LUPerson MIM pretraining +
+#                        TransReID fine-tune) trained natively here from a
+#                        released ReID checkpoint; the output ``.pth`` keeps the
+#                        TransReID key layout TRACE's ``backend: personvit``
+#                        adapter loads unchanged.
 # --------------------------------------------------------------------------- #
 
 
@@ -371,6 +376,113 @@ class ClipReIDExperimentConfig(BaseModel):
     wandb: WandbConfig = Field(default_factory=WandbConfig)
 
 
+class PersonViTModelConfig(BaseModel):
+    """PersonViT architecture + read-out — must match TRACE's ``personvit`` backend.
+
+    The backbone geometry (width / depth / patch size) is NOT configurable: it is
+    read off the starting checkpoint, which makes an architecture mismatch
+    impossible. Only the resolution and the read-out point are choices.
+
+    Attributes:
+        weights: Starting checkpoint to fine-tune from — a released PersonViT
+            ReID ``.pth`` (https://huggingface.co/lakeAGI/PersonViTReID) or one
+            of our own runs. The default is the MSMT17 checkpoint TRACE deploys
+            (``tuned/default_general.personvit-msmt17.yaml``) and that won the
+            2026-08-27 A/B; the backbone and BNNeck are warm-started from it and
+            the identity head re-initialised.
+        input_size: Crop input size ``[H, W]``. Must be the checkpoint's training
+            resolution — the position embedding is not interpolated (256x128 for
+            every released checkpoint).
+        neck_feat: Which feature evaluation scores: ``after`` (BNNeck output, what
+            TRACE deploys) or ``before`` (pre-BN class token, the upstream
+            ``TEST.NECK_FEAT``). Keep ``after`` unless reproducing that A/B's
+            losing arm — the pre-BN feature's compressed cosine scale sits inside
+            the production similarity gates.
+        drop_path: Stochastic-depth rate during training (upstream MODEL.DROP_PATH).
+    """
+
+    weights: Path = Path(
+        "~/src/PersonViT/weights/msmt.vitb.lup.256x128.wopt.csk.4-8.ar.375.n8.e0260"
+        ".transformer_120.pth"
+    )
+    input_size: tuple[int, int] = (256, 128)
+    neck_feat: Literal["before", "after"] = "after"
+    drop_path: float = 0.1
+
+
+class PersonViTTrainConfig(BaseModel):
+    """PersonViT fine-tune hyperparameters (the released checkpoints' TransReID recipe).
+
+    Defaults reproduce the upstream fine-tuning run for these weights
+    (``PersonViT/transreid_pytorch/configs/msmt17/vit_base.yml`` plus the
+    overrides in the shipped ``train_log.txt``: SGD, base LR 4e-4, 120 epochs,
+    20-epoch warm-up, ID + soft-margin triplet, no label smoothing). Warm-starting
+    from an ALREADY fine-tuned ReID checkpoint (the default) is a shorter journey
+    than upstream's from-MIM-pretraining one, so a lower ``lr`` and fewer
+    ``epochs`` are usually the first things to try.
+
+    Attributes:
+        epochs: Training epochs.
+        batch: Crops per batch — P * K, so it must divide by ``num_instances``.
+        num_instances: K, crops per identity per batch (the batch-hard triplet
+            loss needs K >= 2).
+        lr: SGD base learning rate for non-bias parameters.
+        bias_lr_factor: Bias LR multiplier (upstream SOLVER.BIAS_LR_FACTOR).
+        weight_decay: Weight decay for non-bias parameters.
+        weight_decay_bias: Weight decay for biases.
+        warmup_epochs: Linear LR warm-up epochs before the cosine decay.
+        id_loss_weight: Weight on the identity cross-entropy.
+        triplet_loss_weight: Weight on the batch-hard triplet loss.
+        triplet_margin: Triplet hinge margin, or ``null`` for the soft-margin
+            form the released checkpoints used (``MODEL.NO_MARGIN: True``).
+        label_smoothing: ID-loss label smoothing (upstream: off, i.e. 0.0).
+        random_erasing: Random-erasing probability (0 disables).
+        amp: Train under fp16 autocast + GradScaler (upstream does).
+        eval_period: Score query/gallery mAP every N epochs (0 disables). Costs
+            a full embedding pass; useful on multi-hour runs to see progress.
+        checkpoint_period: Write ``transformer_<epoch>.pth`` every N epochs.
+        workers: Dataloader worker processes.
+        seed: Global RNG seed.
+        device: ``"auto"``, ``"cpu"``, or a CUDA index string.
+        name: Run name; outputs land in ``runs/reid/<name>/``.
+    """
+
+    epochs: int = 120
+    batch: int = 64
+    num_instances: int = 4
+    lr: float = 4e-4
+    bias_lr_factor: float = 2.0
+    weight_decay: float = 1e-4
+    weight_decay_bias: float = 1e-4
+    warmup_epochs: int = 20
+    id_loss_weight: float = 1.0
+    triplet_loss_weight: float = 1.0
+    triplet_margin: float | None = None
+    label_smoothing: float = 0.0
+    random_erasing: float = 0.5
+    amp: bool = True
+    eval_period: int = 0
+    checkpoint_period: int = 20
+    workers: int = 8
+    seed: int = 42
+    device: str = "auto"
+    name: str = "personvit_person"
+
+
+class PersonViTExperimentConfig(BaseModel):
+    """Full configuration for a PersonViT ReID fine-tune.
+
+    Attributes:
+        family: Discriminator selecting the PersonViT pipeline.
+    """
+
+    family: Literal["reid_personvit"] = "reid_personvit"
+    data: ReIDDataConfig
+    model: PersonViTModelConfig = Field(default_factory=PersonViTModelConfig)
+    train: PersonViTTrainConfig = Field(default_factory=PersonViTTrainConfig)
+    wandb: WandbConfig = Field(default_factory=WandbConfig)
+
+
 def _load_yaml(path: Path, schema: type[_ConfigT]) -> _ConfigT:
     """Load and validate a YAML file against a Pydantic schema.
 
@@ -404,7 +516,11 @@ def load_rfdetr_config(path: Path) -> RFDETRExperimentConfig:
 # Tagged union: the ``family`` field selects which schema validates the YAML,
 # so a single entrypoint can load either model's config (BasicSR-style dispatch).
 AnyExperiment = (
-    YOLOExperimentConfig | RFDETRExperimentConfig | FtNetExperimentConfig | ClipReIDExperimentConfig
+    YOLOExperimentConfig
+    | RFDETRExperimentConfig
+    | FtNetExperimentConfig
+    | ClipReIDExperimentConfig
+    | PersonViTExperimentConfig
 )
 AnyExperimentConfig = Annotated[AnyExperiment, Field(discriminator="family")]
 _EXPERIMENT_ADAPTER: TypeAdapter[AnyExperiment] = TypeAdapter(AnyExperimentConfig)
@@ -415,7 +531,8 @@ def load_experiment(path: Path) -> AnyExperiment:
 
     Args:
         path: Path to the YAML config. Must contain a top-level ``family`` key
-            (``yolo`` / ``rfdetr`` / ``reid_ftnet`` / ``reid_clipreid``).
+            (``yolo`` / ``rfdetr`` / ``reid_ftnet`` / ``reid_clipreid`` /
+            ``reid_personvit``).
 
     Returns:
         The validated config for the matching family.

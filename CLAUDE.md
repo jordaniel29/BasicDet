@@ -186,8 +186,9 @@ branch in the registry.
 
 **Scope boundaries:** fine-tuning + evaluation of the **perception models feeding the
 TRACE tracker**: person **detection** (YOLO26, RF-DETR) and person **ReID embedders**
-(`reid_ftnet`, `reid_clipreid` families; ReID checkpoints must stay drop-in compatible
-with TRACE's `piapf/reid/` loaders — see the module docstrings). ReID intrinsic eval
+(`reid_ftnet`, `reid_clipreid`, `reid_personvit` families; ReID checkpoints must stay
+drop-in compatible with their TRACE-side loaders — `piapf/reid/` for ft_net/CLIP-ReID,
+`apps/trace/worker/reid/personvit.py` for PersonViT — see the module docstrings). ReID intrinsic eval
 (mAP/CMC on query–gallery) lives here; **tracking/MOT benchmarking** (BoT-SORT +
 HOTA/MOTA/IDF1) is run downstream (`~/jordan/boxmot`, TRACE), **not here**. No
 deployment code (TensorRT/ONNX serving export, inference-time quantization, serving

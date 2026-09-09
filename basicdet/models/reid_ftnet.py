@@ -28,12 +28,14 @@ from torch.utils.data import DataLoader
 from basicdet.metrics.reid import evaluate_retrieval
 from basicdet.models.reid_data import (
     CropDataset,
+    build_test_transform,
     build_train_transform,
     extract_features,
     load_market_dataset,
 )
 from basicdet.utils import tracking
 from basicdet.utils.config import FtNetExperimentConfig
+from basicdet.utils.runtime import resolve_torch_device
 from basicdet.utils.seed import set_seed
 
 logger = logging.getLogger(__name__)
@@ -98,14 +100,6 @@ class FtNet(nn.Module):
         return self.classifier(x)
 
 
-def _resolve_torch_device(device: str) -> str:
-    if device == "auto":
-        return "cuda:0" if torch.cuda.is_available() else "cpu"
-    if device.isdigit():
-        return f"cuda:{device}"
-    return device
-
-
 def _strip_head_for_inference(model: FtNet) -> FtNet:
     """Replace the class head with Identity — forward returns the bottleneck feature."""
     model.classifier.classifier = nn.Identity()
@@ -140,7 +134,7 @@ def train(config: FtNetExperimentConfig) -> Path:
         FileNotFoundError: If the dataset directory is missing.
     """
     set_seed(config.train.seed, deterministic=False)
-    device = _resolve_torch_device(config.train.device)
+    device = resolve_torch_device(config.train.device)
     data = load_market_dataset(config.data.dataset_dir)
     out_dir = RUNS_DIR / config.train.name
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -264,11 +258,12 @@ def evaluate(
         ``{"mAP": ..., "rank1": ..., ...}``.
     """
     del split, conf
-    device = _resolve_torch_device(config.train.device)
+    device = resolve_torch_device(config.train.device)
     data = load_market_dataset(config.data.dataset_dir)
     model = _load_checkpoint(config, weights, device)
-    q = extract_features(model, data.query, config.model.input_size, device)
-    g = extract_features(model, data.gallery, config.model.input_size, device)
+    transform = build_test_transform(config.model.input_size)
+    q = extract_features(model, data.query, transform, device)
+    g = extract_features(model, data.gallery, transform, device)
     return evaluate_retrieval(
         q, data.query.pids, data.query.camids, g, data.gallery.pids, data.gallery.camids
     )
@@ -296,11 +291,11 @@ def predict(
     del conf
     from basicdet.models.reid_data import ReIDSplit
 
-    device = _resolve_torch_device(config.train.device)
+    device = resolve_torch_device(config.train.device)
     paths = sorted(Path(source).glob("*.jpg")) + sorted(Path(source).glob("*.png"))
     split = ReIDSplit(paths, np.zeros(len(paths), np.int64), np.zeros(len(paths), np.int64))
     model = _load_checkpoint(config, weights, device)
-    feats = extract_features(model, split, config.model.input_size, device)
+    feats = extract_features(model, split, build_test_transform(config.model.input_size), device)
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
     np.save(output / "features.npy", feats)
