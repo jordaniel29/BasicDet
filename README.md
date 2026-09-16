@@ -24,7 +24,7 @@ pip install -e ".[dev]"
 All three entry points are config-driven and run as modules:
 
 ```bash
-python -m basicdet.train    --config configs/yolo/yolo26l_person_v6.3.yaml
+python -m basicdet.train    --config configs/yolo/example.yaml
 python -m basicdet.evaluate  --config <config.yaml> --weights <checkpoint>
 python -m basicdet.predict   --config <config.yaml> --weights <checkpoint> --source <images>
 ```
@@ -34,13 +34,18 @@ python -m basicdet.predict   --config <config.yaml> --weights <checkpoint> --sou
 
 The config's `family` key dispatches to the right pipeline:
 
-| `family` | Model | Config dir |
+| `family` | Model | Start from |
 |---|---|---|
-| `yolo` | YOLO26 detection | `configs/yolo/` |
-| `rfdetr` | RF-DETR detection | `configs/rfdetr/` |
-| `reid_ftnet` | ft_net ReID embedder | `configs/reid/` |
-| `reid_clipreid` | CLIP-ReID embedder | `configs/reid/` |
-| `reid_personvit` | PersonViT ReID embedder | `configs/reid/` |
+| `yolo` | YOLO26 detection | `configs/yolo/example.yaml` |
+| `rfdetr` | RF-DETR detection | `configs/rfdetr/example.yaml` |
+| `reid_ftnet` | ft_net ReID embedder | `configs/reid/example_ftnet.yaml` |
+| `reid_clipreid` | CLIP-ReID embedder | `configs/reid/example_clipreid.yaml` |
+| `reid_personvit` | PersonViT ReID embedder | `configs/reid/example_personvit.yaml` |
+
+Each `example*.yaml` is a documented template covering every field the schema
+accepts — copy one to start an experiment. Configs from past runs are kept in
+`configs/experiments/`, which is gitignored: they are a record of what was run
+here, not something to copy from.
 
 ## Layout
 
@@ -52,9 +57,14 @@ basicdet/                 # importable package (pip-installed editable)
 ├── models/               # per-family pipelines (yolo, rfdetr, reid_*)
 ├── metrics/              # COCO mAP, ReID mAP/CMC
 └── utils/                # config schemas, registry, seed, tracking
-configs/{yolo,rfdetr,reid}/*.yaml       # one YAML per experiment
-curation/                 # dataset build / review / packaging tools
-assets/data/              # datasets (gitignored)
+configs/{yolo,rfdetr,reid}/example*.yaml  # documented templates, one per family
+configs/experiments/      # past run configs (gitignored — a local record)
+curation/                 # dataset tooling
+├── reid/                 #   reusable: cut crops, review, package, combine, audit
+└── recipes/              #   one module or YAML per dataset actually built
+                          #   (gitignored — a local record, not part of the framework)
+assets/data/{detection,reid,source}/   # datasets by task (gitignored)
+assets/model/{detection,reid}/         # checkpoints by task (gitignored)
 runs/                     # training / eval outputs (gitignored)
 tests/                    # pytest
 ```

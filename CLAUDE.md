@@ -110,7 +110,8 @@ basicdet/                  # importable package AT THE REPO ROOT (no src/)
 ├── models/                # per-model-family pipelines
 ├── metrics/  utils/       # shared source modules
 configs/                   # YAML experiment configs — no hardcoded values in Python
-assets/data/               # datasets (gitignored)
+assets/data/<task>/        # datasets by task: detection/ reid/ source/ (gitignored)
+assets/model/<task>/       # checkpoints by task: detection/ reid/ (gitignored)
 runs/                      # training/eval outputs (gitignored)
 tests/                     # pytest, mirrors the package layout
 pyproject.toml             # tooling config + pinned dependencies
@@ -148,8 +149,14 @@ Data processing, model training, and detection evaluation only.
 
 **Environment:** Managed with **conda** — env name `persondet`. Run
 `conda activate persondet` before any work, then `pip install -e ".[dev]"`. Use
-`python -m pip` inside the env (a bare `pip` can fall through to system pip). Run
-GPU work on **GPU 1** (`CUDA_VISIBLE_DEVICES=1`); GPU 0 is reserved for the user.
+`python -m pip` inside the env (a bare `pip` can fall through to system pip).
+
+**GPU:** this host has a **single** H100 80GB, visible as index `0` — so configs
+set `device: "0"` and there is no `CUDA_VISIBLE_DEVICES=1` to export. (Earlier
+guidance reserved GPU 0 and sent work to GPU 1; that machine had two cards. The
+few configs predating the change that still said `device: "1"` were removed in
+the 2026-09-16 cleanup, so every config in `configs/` now targets index 0.) One GPU means **one training run at a time**:
+queue long jobs sequentially in tmux rather than launching them in parallel.
 
 ### Repository structure (flat layout, BasicSR-style)
 
@@ -170,8 +177,35 @@ basicdet/                       # flat package, pip-installed editable
     ├── registry.py             # family -> pipeline dispatch (lazy per-family import)
     ├── tracking.py             # W&B integration
     └── seed.py  logging.py  runtime.py
-configs/{yolo,rfdetr}/*.yaml    # one YAML per experiment; named <model><size>_person_<ver>
-assets/data/persondet_v*/       # datasets (gitignored): YOLO images/+labels/ + COCO annotations/
+configs/{yolo,rfdetr,reid}/example*.yaml  # TRACKED: one documented template per
+                               #   family — the only configs meant to be copied
+configs/experiments/           # gitignored: configs of runs actually done here
+curation/                      # dataset tooling, split by what it is:
+├── reid/                      #   TRACKED library — crops.py (parse labels, quality
+│                              #   floors, temporal stride, cut from video),
+│                              #   package.py (Market-1501 layout; REFUSES a split
+│                              #   whose train and eval share an identity, or whose
+│                              #   query has no cross-camera gallery match),
+│                              #   review.py (embed with the deployed encoder, score
+│                              #   each crop against its identity centroid, contact
+│                              #   sheets), combine.py (union sources, recipe-driven),
+│                              #   audit.py (structural audit of any packaged set)
+├── *.py                       #   TRACKED MTMDC detection pipeline (curation.md)
+└── recipes/                   #   gitignored: ONE module or YAML per dataset actually
+                               #   built — paths, scenario lists, held-out identities.
+                               #   Curating a new source = copy the nearest recipe,
+                               #   NOT new tooling.
+assets/data/                    # datasets, organized BY TASK (all gitignored):
+├── detection/persondet_v*/     #   YOLO images/+labels/ + COCO annotations/ + rfdetr/
+├── detection/pia_tracking_prelabel/  # review-pending ensemble pre-labels
+├── reid/<source>_v*/           #   ONE DIR PER SOURCE, each Market-1501 layout
+│                               #   (bounding_box_train/query/bounding_box_test) + README.md:
+│                               #   market_1501/ · mtmmc_v2/ · pia_aihub_v2/ · pia_aihub2_v2/
+│                               #   + combined_v*/ (hardlinked unions) and old/ (retired
+│                               #   versions, metadata only). Index: assets/data/reid/README.md
+└── tracking/PIA_tracking/      #   raw footage + MOT gt; feeds BOTH detection and reid,
+                                #   which is why it is not a task folder
+assets/model/{detection,reid}/  # checkpoints by task (gitignored)
 runs/                           # outputs (gitignored): runs/detect/yolo26/<name>/ (Ultralytics
                                 #   forces the runs/detect/ prefix), runs/rfdetr/<name>/
 tests/                          # pytest — deterministic logic (config loading, etc.)
