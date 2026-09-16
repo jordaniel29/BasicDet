@@ -1,6 +1,6 @@
 """Shared ReID data utilities — Market-1501 layout, crop dataset, transforms, P x K sampler.
 
-The curated ReID sets (``assets/data/persondet_reid_v*``) use the Market-1501
+The curated ReID sets (``assets/data/reid/persondet_reid_v*``) use the Market-1501
 directory layout so both the native ft_net trainer and the official CLIP-ReID
 codebase can consume them without adapters:
 

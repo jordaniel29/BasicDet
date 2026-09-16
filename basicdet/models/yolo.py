@@ -72,6 +72,8 @@ def train(config: YOLOExperimentConfig) -> Any:
         device=device,
         project=config.train.project,
         name=config.train.name,
+        # Last so an `extra` key deliberately overrides the typed field above.
+        **config.train.extra,
     )
 
 

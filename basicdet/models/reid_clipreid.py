@@ -109,9 +109,56 @@ class PersondetReID(BaseImageDataset):
 
 
 _mdl.__factory["persondet"] = PersondetReID
+
+# Warm-start from an existing CLIP-ReID checkpoint. The official trainer never
+# calls load_param, so wrap make_model instead: train_clipreid does
+# `from model.make_model_clipreid import make_model` at its own import time,
+# which happens inside runpy below — so patching the module attribute now is
+# picked up. Identity- and camera-sized tensors (classifier, classifier_proj,
+# prompt_learner.cls_ctx, cv_embed) cannot transfer to a dataset with a
+# different identity/camera count, so they are skipped on shape mismatch and
+# stay randomly initialised.
+__WARM_START__
+
+
 sys.argv = ["train_clipreid.py", "--config_file", __CONFIG_FILE__] + __OPTS__
 runpy.run_path("train_clipreid.py", run_name="__main__")
 '''
+
+_WARM_START_TEMPLATE = """import torch
+import model.make_model_clipreid as _mm
+
+_WEIGHTS = __WEIGHTS__
+_orig_make_model = _mm.make_model
+
+
+def _load_transferable(net, path):
+    sd = torch.load(path, map_location="cpu", weights_only=False)
+    if isinstance(sd, dict) and "state_dict" in sd:
+        sd = sd["state_dict"]
+    own = net.state_dict()
+    loaded, skipped = [], []
+    for k, v in sd.items():
+        key = k.replace("module.", "")
+        if key in own and own[key].shape == v.shape:
+            own[key].copy_(v)
+            loaded.append(key)
+        else:
+            skipped.append(key)
+    print("[warm-start] loaded {}/{} tensors from {}".format(len(loaded), len(sd), path))
+    print("[warm-start] skipped (shape mismatch or absent): {}".format(sorted(skipped)))
+    if not loaded:
+        raise RuntimeError("warm-start loaded 0 tensors — wrong checkpoint for this architecture?")
+
+
+def _make_model_warm(cfg, num_class, camera_num, view_num):
+    net = _orig_make_model(cfg, num_class=num_class, camera_num=camera_num, view_num=view_num)
+    _load_transferable(net, _WEIGHTS)
+    return net
+
+
+_mm.make_model = _make_model_warm
+"""
 
 
 def _require_checkout() -> None:
@@ -227,18 +274,14 @@ def train(config: ClipReIDExperimentConfig) -> Path:
         consumable by TRACE's ``piaspace_clip_reid`` and the TRT converter.
 
     Raises:
-        FileNotFoundError: If the third_party checkout or dataset is missing.
-        NotImplementedError: If ``train.pretrain_weights`` is set (the official
-            recipe starts from OpenAI CLIP; warm-starting from an existing
-            CLIP-ReID checkpoint needs a load_param hook not yet wired).
+        FileNotFoundError: If the third_party checkout, dataset, or
+            ``train.pretrain_weights`` checkpoint is missing.
         RuntimeError: If the subprocess exits non-zero.
     """
     _require_checkout()
-    if config.train.pretrain_weights is not None:
-        raise NotImplementedError(
-            "pretrain_weights: warm-starting from an existing CLIP-ReID checkpoint is "
-            "not wired yet — the official recipe fine-tunes from OpenAI CLIP weights."
-        )
+    warm = config.train.pretrain_weights
+    if warm is not None and not Path(warm).is_file():
+        raise FileNotFoundError(f"pretrain_weights checkpoint not found: {warm}")
     load_market_dataset(config.data.dataset_dir)  # fail fast on layout problems
 
     out_dir = (RUNS_DIR / config.train.name).resolve()
@@ -248,10 +291,19 @@ def train(config: ClipReIDExperimentConfig) -> Path:
 
     opts = [str(x) for kv in config.train.extra.items() for x in kv]
     launcher = out_dir / "launcher.py"
-    launcher_code = _LAUNCHER_TEMPLATE.replace("__CONFIG_FILE__", repr(str(cfg_path))).replace(
-        "__OPTS__", repr(opts)
+    warm_block = (
+        _WARM_START_TEMPLATE.replace("__WEIGHTS__", repr(str(Path(warm).resolve())))
+        if warm is not None
+        else ""
+    )
+    launcher_code = (
+        _LAUNCHER_TEMPLATE.replace("__CONFIG_FILE__", repr(str(cfg_path)))
+        .replace("__OPTS__", repr(opts))
+        .replace("__WARM_START__", warm_block)
     )
     launcher.write_text(launcher_code)
+    if warm is not None:
+        logger.info("warm-starting from %s (identity/camera tensors will be skipped)", warm)
 
     env = dict(os.environ)
     # The launcher runs by absolute path, so cwd is not on sys.path — the

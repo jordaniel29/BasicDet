@@ -27,7 +27,10 @@ from pathlib import Path
 # Raw source (read-only — never modified).
 RAW_ROOT = Path.home() / "jordan/ai_public/tracking_dataset/06_multisensor_trajectory_tracking"
 # Where curated datasets and the shared frame pool live (local SSD, fast train I/O).
-DATA_ROOT = Path.home() / "jordan/Person-Det/assets/data"
+# Repo-relative: datasets moved to the per-task ``assets/data/detection/`` layout,
+# and the previous ``~/jordan/Person-Det`` absolute path no longer exists. Deriving
+# this from the file location keeps every curation script working after a move.
+DATA_ROOT = Path(__file__).resolve().parent.parent / "assets/data/detection"
 # Shared, deduplicated-by-subsampling frame pool reused by every v4 version.
 # Images are hardlinked from here into each version (same filesystem -> no copy).
 FRAME_POOL = DATA_ROOT / "_mtmdc_frames"

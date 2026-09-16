@@ -5,7 +5,7 @@ The config's ``family`` field selects the pipeline.
 Usage:
     python basicdet/predict.py --config configs/yolo26_person.yaml \
         --weights runs/detect/yolo26/basicdet/weights/best.pt \
-        --source assets/data/persondet_v1.1/images/test \
+        --source assets/data/detection/persondet_v1.1/images/test \
         --output runs/predict/basicdet
 """
 

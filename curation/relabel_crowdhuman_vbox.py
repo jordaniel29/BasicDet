@@ -18,7 +18,7 @@ This tool builds ``persondet_v2.2`` from ``persondet_v2.1``:
   * all other sources' labels (``mot_``) copied verbatim;
   * COCO rebuilt per split from the resulting YOLO labels.
 
-The raw ``.odgt`` files live in ``assets/data/_crowdhuman_odgt/`` (downloaded
+The raw ``.odgt`` files live in ``assets/data/tracking/_crowdhuman_odgt/`` (downloaded
 from the official mirror https://huggingface.co/datasets/sshao0516/CrowdHuman;
 box-format reference: https://arxiv.org/pdf/1805.00123).
 

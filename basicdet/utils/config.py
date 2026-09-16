@@ -66,6 +66,12 @@ class TrainConfig(BaseModel):
             ``runs/detect/<project>/<name>`` (Ultralytics prepends its
             ``runs_dir/detect``), so use a plain label, not a path.
         name: Run name; the run is written to ``<project>/<name>``.
+        extra: Extra keyword args forwarded verbatim to ``model.train`` — the
+            escape hatch for Ultralytics settings this schema does not name
+            (``save_period``, ``warmup_epochs``, ``freeze``, ``cos_lr``,
+            ``mosaic``, …). Mirrors the RF-DETR config's passthrough. Keys here
+            override the typed fields above, so do not restate ``lr0`` or
+            ``epochs`` in it.
     """
 
     epochs: int = 100
@@ -81,6 +87,7 @@ class TrainConfig(BaseModel):
     deterministic: bool = True
     project: str = "yolo26"
     name: str = "basicdet"
+    extra: dict[str, Any] = Field(default_factory=dict)
 
 
 class WandbConfig(BaseModel):
@@ -357,7 +364,7 @@ class ClipReIDTrainConfig(BaseModel):
     device: str = "auto"
     name: str = "clipreid_person"
     piaspace_pkg: Path = Path(
-        "/home/jordan/jordan/TRACE_SSAVE-AI-MVP/packages/piaspace-clip-reid/src"
+        "/home/work/Jordan/TRACE_SSAVE-AI-MVP/packages/piaspace-clip-reid/src"
     )
     extra: dict[str, Any] = Field(default_factory=dict)
 

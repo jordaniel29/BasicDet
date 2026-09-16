@@ -12,7 +12,11 @@ description = "A base framework for fine-tuning and evaluating object-detection 
 requires-python = ">=3.11"
 dependencies = [
     "ultralytics>=8.3",
-    "rfdetr>=1.0",
+    # The [train] extra (pytorch-lightning, torchmetrics) is required by
+    # basicdet/models/rfdetr.py — plain `rfdetr` only ships the inference path and
+    # raises ImportError the moment training starts. Not [train,loggers]: the
+    # loggers extra adds mlflow/clearml/tensorboard, and this repo tracks with W&B.
+    "rfdetr[train]>=1.0",
     "supervision>=0.22",
     "pycocotools>=2.0",
     "pillow>=10.0",
