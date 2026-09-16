@@ -455,9 +455,13 @@ def test_personvit_forward_shapes_and_neck_feat(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("path", "family"),
     [
-        ("configs/reid/ftnet_person_v1.yaml", "reid_ftnet"),
-        ("configs/reid/clipreid_person_v1.yaml", "reid_clipreid"),
-        ("configs/reid/personvit_person_atustc9.yaml", "reid_personvit"),
+        # The tracked example per ReID family. Real experiment configs live in
+        # configs/experiments/ and are gitignored, so they cannot be tested on a
+        # fresh clone — these examples are what must stay loadable, and their
+        # input_size is what TRACE inference requires.
+        ("configs/reid/example_ftnet.yaml", "reid_ftnet"),
+        ("configs/reid/example_clipreid.yaml", "reid_clipreid"),
+        ("configs/reid/example_personvit.yaml", "reid_personvit"),
     ],
 )
 def test_reid_configs_load(path: str, family: str) -> None:
