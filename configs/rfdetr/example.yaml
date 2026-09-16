@@ -1,0 +1,40 @@
+# EXAMPLE — RF-DETR person-detection fine-tune. Copy this, don't edit it in place.
+#
+# Run:   python basicdet/train.py    --config configs/rfdetr/example.yaml
+#        python basicdet/evaluate.py --config configs/rfdetr/example.yaml --weights <ckpt>
+#
+# Real experiment configs live in configs/experiments/ (gitignored).
+
+family: rfdetr
+
+data:
+  # RF-DETR wants rfdetr/{train,valid,test}/ — note "valid", NOT "val" — each
+  # holding images + _annotations.coco.json. A dataset that only ships central
+  # annotations/ + images/ needs that layout built first; use hardlinks so it
+  # costs no extra disk.
+  dataset_dir: assets/data/detection/persondet_v7.1/rfdetr
+
+model:
+  variant: large        # nano | small | medium | base | large
+  resolution: null      # null keeps the variant's native resolution
+  num_classes: null     # null infers from the COCO json (person-only here)
+
+train:
+  epochs: 50
+  batch_size: 4         # RF-DETR is memory-hungry; raise grad_accum_steps
+  grad_accum_steps: 4   # instead to reach an effective batch of 16
+  lr: 1.0e-4
+  num_workers: 8
+  seed: 42
+  early_stopping: true
+  tensorboard: false
+  output_dir: runs/rfdetr/example
+  run_name: example
+  extra: {}             # e.g. resume: <ckpt> -> Lightning ckpt_path, which
+                        # restores epoch, optimizer and EMA state
+
+wandb:
+  enabled: false
+  project: person-det
+  entity: null
+  log_model: true

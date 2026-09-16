@@ -40,3 +40,11 @@ outputs/
 .vscode/
 third_party/
 reid_tao
+
+# Campaign log, not framework — kept locally, never committed.
+# configs/<family>/example*.yaml are the tracked, documented templates; every
+# real experiment config is a record of one past run and lives here instead.
+configs/experiments/
+# One module per dataset actually built (paths, scenario lists, held-out ids).
+# The reusable half lives in curation/reid/ and curation/*.py, which ARE tracked.
+curation/recipes/

@@ -1,0 +1,39 @@
+# EXAMPLE — ft_net (ResNet-50) person-embedder fine-tune, the lightest of the
+# three ReID families. Copy this, don't edit in place.
+#
+# Run:   python basicdet/train.py --config configs/reid/example_ftnet.yaml
+#
+# Checkpoints must stay loadable by TRACE's piapf/reid/ loader.
+# Real experiment configs live in configs/experiments/reid/ (gitignored).
+
+family: reid_ftnet
+
+data:
+  dataset_dir: assets/data/reid/combined_v3
+
+model:
+  linear_num: 512       # embedding dimension after the bottleneck
+  stride: 2             # 1 removes the last downsample (finer features, slower)
+  droprate: 0.5
+  imagenet_init: true
+  input_size: [256, 128]  # must match TRACE inference
+
+train:
+  epochs: 60
+  batch: 32
+  lr: 0.05              # head LR; the backbone uses lr * backbone_lr_scale
+  backbone_lr_scale: 0.1
+  weight_decay: 5.0e-4
+  label_smoothing: 0.1
+  step_lr_epochs: 20
+  step_lr_gamma: 0.1
+  warmup_epochs: 5
+  random_erasing: 0.5
+  workers: 8
+  seed: 42
+  device: "0"
+  name: example         # -> runs/reid/<name>/
+
+wandb:
+  enabled: false
+  project: person-det

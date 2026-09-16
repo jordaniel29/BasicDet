@@ -1,0 +1,45 @@
+# EXAMPLE — PersonViT person-embedder fine-tune. Copy this, don't edit in place.
+#
+# Run:   python basicdet/train.py --config configs/reid/example_personvit.yaml
+#
+# Checkpoints must stay loadable by TRACE's apps/trace/worker/reid/personvit.py.
+# Real experiment configs live in configs/experiments/reid/ (gitignored).
+
+family: reid_personvit
+
+data:
+  dataset_dir: assets/data/reid/combined_v3
+
+model:
+  # LUPerson MIM backbone in TransReID layout. curation/convert_personvit_mim.py
+  # converts the upstream MIM release into this layout.
+  weights: assets/model/reid/msmt.vitb.lup.256x128.wopt.csk.4-8.ar.375.n8.e0260.transformer_120.pth
+  input_size: [256, 128]  # must match TRACE inference
+  neck_feat: after        # "after" (post-BN) is what TRACE deploys
+  drop_path: 0.1
+
+train:
+  epochs: 120
+  batch: 64
+  num_instances: 4      # PK sampler; batch/num_instances identities per batch
+  lr: 4.0e-4
+  bias_lr_factor: 2.0
+  weight_decay: 1.0e-4
+  weight_decay_bias: 1.0e-4
+  warmup_epochs: 20
+  id_loss_weight: 1.0
+  triplet_loss_weight: 1.0
+  triplet_margin: null  # null uses the soft-margin (log1p) form
+  label_smoothing: 0.0
+  random_erasing: 0.5
+  amp: true
+  eval_period: 10       # 0 disables mid-training eval
+  checkpoint_period: 20
+  workers: 8
+  seed: 42
+  device: "0"
+  name: example         # -> runs/reid/<name>/
+
+wandb:
+  enabled: false
+  project: person-det

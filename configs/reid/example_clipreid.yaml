@@ -1,0 +1,56 @@
+# EXAMPLE — CLIP-ReID person-embedder fine-tune (the deployed TRACE encoder).
+# Copy this, don't edit it in place.
+#
+# Run:   python basicdet/train.py    --config configs/reid/example_clipreid.yaml
+#        python basicdet/evaluate.py --config configs/reid/example_clipreid.yaml \
+#                                    --weights runs/reid/<name>/ViT-B-16_60.pth
+#
+# Wraps the official two-stage trainer vendored at third_party/CLIP-ReID:
+#   stage 1 freezes both CLIP encoders and learns per-identity text prompts;
+#   stage 2 freezes the prompts and fine-tunes the image encoder against them.
+# Both stages run in one process; the stage-2 checkpoint is what TRACE loads.
+#
+# Real experiment configs live in configs/experiments/reid/ (gitignored).
+
+family: reid_clipreid
+
+data:
+  # Market-1501 layout: bounding_box_train/ + query/ + bounding_box_test/, with
+  # crops named <pid>_c<camid>_*.jpg. See assets/data/reid/README.md for which
+  # sets exist and how each is built; audit a new one with
+  #   python -m curation.reid.audit --dataset <dir>
+  dataset_dir: assets/data/reid/combined_v3
+
+model:
+  backbone: ViT-B-16
+  stride: 12            # overlapping patches — the deployed "12x12sie" arch
+  sie_camera: true      # side-information embedding per camera. Only safe when
+                        # camera ids are globally distinct: combining sources
+                        # without remapping fuses unrelated cameras silently.
+  input_size: [256, 128]  # must match TRACE inference; do not change
+
+train:
+  stage1_epochs: 120    # the paper's budget, applied verbatim at every scale
+  stage2_epochs: 60     # also what makes the STEPS [30, 50] milestones
+                        # reachable — below 30, LR never anneals
+  batch: 64
+  num_instances: 4      # PK sampler: 64/4 = 16 identities per batch, so the
+                        # dataset needs >= 16 train identities
+  base_lr_stage2: 5.0e-6
+  pretrain_weights: null  # null starts from OpenAI CLIP. A .pth here warm-starts;
+                          # identity/camera-sized tensors are skipped on shape
+                          # mismatch and stay randomly initialised.
+  workers: 8
+  seed: 42
+  device: "0"
+  name: example         # -> runs/reid/<name>/
+  # TRACE's piaspace-clip-reid package, used by evaluate/predict so every eval
+  # doubles as a deployment-contract test. Its sibling piaspace-trt-runtime must
+  # be importable too.
+  piaspace_pkg: /home/work/Jordan/repo/TRACE_SSAVE-AI-MVP/packages/piaspace-clip-reid/src
+  extra: {}             # dotted overrides into the official yacs config,
+                        # e.g. SOLVER.STAGE1.LR_MIN: 1.0e-6
+
+wandb:
+  enabled: false        # the official trainer logs to file; W&B is not wired in
+  project: person-det

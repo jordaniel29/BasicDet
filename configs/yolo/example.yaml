@@ -1,0 +1,50 @@
+# EXAMPLE — YOLO26 person-detection fine-tune. Copy this, don't edit it in place.
+#
+# Run:   python basicdet/train.py    --config configs/yolo/example.yaml
+#        python basicdet/evaluate.py --config configs/yolo/example.yaml --weights <run>/weights/best.pt
+#        python basicdet/predict.py  --config configs/yolo/example.yaml --weights <...> --source <dir|video>
+#
+# `family` is what basicdet/utils/registry.py dispatches on; everything below it
+# is validated by the matching Pydantic schema in basicdet/utils/config.py, so a
+# typo is a startup error rather than a silent default.
+#
+# Real experiment configs live in configs/experiments/ (gitignored: they are a
+# local record of past runs, not something to copy from).
+
+family: yolo
+
+data:
+  # Ultralytics data.yaml: `path` + train/val/test image dirs + class names.
+  # Each persondet_v*/data.yaml ships with a macOS `path:` — repoint it at the
+  # local absolute path first, or training silently sees zero labels.
+  yaml_path: assets/data/detection/persondet_v7.1/data.yaml
+
+model:
+  # yolo26n / s / m / l / x. A bare name downloads from the Ultralytics hub;
+  # a path warm-starts from your own checkpoint.
+  weights: yolo26l.pt
+  imgsz: 640            # must match the deployed TRT engine's input size
+
+train:
+  epochs: 100
+  batch: 64             # 640px + 80GB H100; lower this for the x variant
+  optimizer: auto       # "auto" lets Ultralytics pick and IGNORES lr0 — name an
+                        # optimizer (AdamW/SGD) whenever lr0 below matters
+  lr0: 0.01
+  patience: 50          # early-stop after N epochs with no val improvement
+  workers: 16
+  seed: 42              # logged by set_seed(); keep fixed across an ablation
+  device: "0"           # single H100 on this host, exposed as index 0
+  fraction: 1.0         # <1.0 trains on a subset — smoke tests only
+  cache: ram            # ram for small/medium sets; disk beyond ~50k images,
+                        # where RAM caching would exhaust system memory
+  deterministic: true
+  project: yolo26       # Ultralytics forces the runs/detect/ prefix, so output
+  name: example         # lands in runs/detect/yolo26/<name>/
+  extra: {}             # any other Ultralytics arg, passed straight through
+
+wandb:
+  enabled: false        # set true once `wandb login` has been run
+  project: person-det
+  entity: null
+  log_model: true
