@@ -44,6 +44,21 @@ def test_load_mot_parses_and_sorts_by_frame(tmp_path: Path) -> None:
     assert boxes[1].w == pytest.approx(50.42)
 
 
+def test_load_mot_parses_class_and_defaults_to_person() -> None:
+    # MOTChallenge class 8 is an "ignore region" — a box scored neither way.
+    # ai_hub_v4 ships 85 of them, and cutting one as a person mislabels the crop.
+    assert box(frame=1).cls == 1
+
+
+def test_load_mot_reads_the_class_column(tmp_path: Path) -> None:
+    p = tmp_path / "cam1.txt"
+    p.write_text(
+        "1,1,10,10,60,150,1,1,1.00\n2,933,10,10,60,150,1,8,1.00\n",
+        encoding="utf-8",
+    )
+    assert [b.cls for b in crops.load_mot(p)] == [1, 8]
+
+
 def test_load_mot_rejects_short_rows(tmp_path: Path) -> None:
     p = tmp_path / "bad.txt"
     p.write_text("54,6,836.63,160.93,49.34\n")

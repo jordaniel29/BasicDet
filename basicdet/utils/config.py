@@ -364,7 +364,7 @@ class ClipReIDTrainConfig(BaseModel):
     device: str = "auto"
     name: str = "clipreid_person"
     piaspace_pkg: Path = Path(
-        "/home/work/Jordan/TRACE_SSAVE-AI-MVP/packages/piaspace-clip-reid/src"
+        "/home/work/Jordan/repo/TRACE_SSAVE-AI-MVP/packages/piaspace-clip-reid/src"
     )
     extra: dict[str, Any] = Field(default_factory=dict)
 

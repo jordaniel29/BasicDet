@@ -46,6 +46,11 @@ class MotBox:
         w: Box width in pixels.
         h: Box height in pixels.
         vis: Visibility in ``[0, 1]``; 1.0 means unoccluded by another target.
+        cls: MOT class. 1 is a scoreable person; MOTChallenge reserves 8 for an
+            "ignore region" — a box deliberately scored neither way, which here
+            marks an unidentified bystander or an un-redrawable box. Cutting one
+            as if it were a person mislabels a crop, so recipes whose source has
+            them must filter on this. Defaults to 1 for sources that omit it.
     """
 
     frame: int
@@ -55,6 +60,7 @@ class MotBox:
     w: float
     h: float
     vis: float
+    cls: int = 1
 
 
 @dataclass(frozen=True)
@@ -160,6 +166,7 @@ def load_mot(path: Path) -> list[MotBox]:
                 w=float(f[4]),
                 h=float(f[5]),
                 vis=float(f[8]),
+                cls=int(float(f[7])),
             )
         )
     boxes.sort(key=lambda b: (b.frame, b.tid))

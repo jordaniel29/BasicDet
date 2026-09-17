@@ -100,19 +100,25 @@ def _scan_split(split_dir: Path) -> ReIDSplit:
     return ReIDSplit(paths, np.asarray(pids, dtype=np.int64), np.asarray(camids, dtype=np.int64))
 
 
-def load_market_dataset(dataset_dir: Path) -> MarketDataset:
+def load_market_dataset(dataset_dir: Path, require_train: bool = True) -> MarketDataset:
     """Scan a Market-1501-layout directory into typed splits.
 
     Args:
         dataset_dir: Directory with ``bounding_box_train``, ``query`` and
             ``bounding_box_test`` subfolders.
+        require_train: Raise if the training split is empty. Training must keep
+            this on — an empty train split there is a broken copy that would
+            otherwise surface as a silent mAP of 0. Evaluation-only datasets
+            (curated deliberately with no train split, so they can never be
+            trained on) pass ``False``; ``evaluate`` reads query/gallery only.
 
     Returns:
         The parsed dataset; training pids relabelled to contiguous indices.
+        ``num_train_pids`` is 0 for an evaluation-only set.
 
     Raises:
         FileNotFoundError: If a required split folder is missing.
-        ValueError: If the training split is empty.
+        ValueError: If the training split is empty and ``require_train``.
     """
     for sub in ("bounding_box_train", "query", "bounding_box_test"):
         if not (dataset_dir / sub).is_dir():
@@ -123,7 +129,7 @@ def load_market_dataset(dataset_dir: Path) -> MarketDataset:
     kept_paths = [p for p, k in zip(raw_train.paths, keep, strict=True) if k]
     kept_pids = raw_train.pids[keep]
     kept_camids = raw_train.camids[keep]
-    if len(kept_paths) == 0:
+    if len(kept_paths) == 0 and require_train:
         raise ValueError(f"no training crops under {dataset_dir / 'bounding_box_train'}")
 
     unique = np.unique(kept_pids)

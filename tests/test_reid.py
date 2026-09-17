@@ -139,6 +139,29 @@ def test_load_market_dataset_missing_split(tmp_path: Path) -> None:
         load_market_dataset(tmp_path)
 
 
+def test_load_market_dataset_rejects_empty_train_by_default(tmp_path: Path) -> None:
+    # An empty train split under a training config is a half-copied dataset, and
+    # training through it would report mAP 0 with no explanation.
+    root = _make_market_dir(tmp_path)
+    for stale in (root / "bounding_box_train").iterdir():
+        stale.unlink()
+    with pytest.raises(ValueError, match="no training crops"):
+        load_market_dataset(root)
+
+
+def test_load_market_dataset_allows_empty_train_for_eval_only_sets(tmp_path: Path) -> None:
+    # Evaluation-only sets (pia_aihub4_v1) ship no train split on purpose, so
+    # they can never be trained on; evaluate() reads query/gallery only.
+    root = _make_market_dir(tmp_path)
+    for stale in (root / "bounding_box_train").iterdir():
+        stale.unlink()
+    data = load_market_dataset(root, require_train=False)
+    assert data.num_train_pids == 0
+    assert data.train.paths == []
+    assert len(data.query.paths) == 6
+    assert len(data.gallery.paths) == 6
+
+
 # --------------------------------------------------------------------------- #
 # ft_net checkpoint compatibility with the TRACE loader
 # --------------------------------------------------------------------------- #

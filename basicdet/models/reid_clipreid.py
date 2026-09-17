@@ -387,7 +387,9 @@ def evaluate(
         ``{"mAP": ..., "rank1": ..., ...}``.
     """
     del split, conf
-    data = load_market_dataset(config.data.dataset_dir)
+    # Evaluation-only sets (e.g. pia_aihub4_v1) ship an empty train split by
+    # design; only query/gallery are read below.
+    data = load_market_dataset(config.data.dataset_dir, require_train=False)
     embedder = _deployed_embedder(config, weights)
     q = _embed_split(embedder, data.query)
     g = _embed_split(embedder, data.gallery)
