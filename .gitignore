@@ -47,4 +47,4 @@ reid_tao
 configs/experiments/
 # One module per dataset actually built (paths, scenario lists, held-out ids).
 # The reusable half lives in curation/reid/ and curation/*.py, which ARE tracked.
-curation/recipes/
+curation/local/
