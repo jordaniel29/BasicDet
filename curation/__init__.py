@@ -1,11 +1,13 @@
-"""Dataset-curation tooling for the MTMDC multi-sensor source (persondet_v4.x).
+"""Dataset-curation tooling, kept separate from the installable ``basicdet`` wheel.
 
-Run the stages as modules from the repo root:
+Two kinds of thing live under this package, and the split is deliberate:
 
-    python -m curation.extract_frames        # Stage 1: video -> shared frame pool
-    python -m curation.build_version v4.1     # Stages 3+5: split, labels, COCO, docs
-    python -m curation.build_version v4.2
-    python -m curation.verify_version v4.1    # Stage 4: integrity checks
-
-See ``curation.md`` (repo root) for the full playbook this implements.
+* **Tools** (tracked): :mod:`curation.reid` — cut, review, package, combine and
+  audit ReID crops for any tracked-footage source — and
+  :mod:`curation.convert_personvit_mim`. A tool is anything still useful for a
+  dataset that does not exist yet.
+* **Recipes** (``curation/recipes/``, gitignored): one module or YAML per dataset
+  actually built here — paths, scenario lists, held-out identities — plus the
+  MTMDC detection pipeline and its playbook under ``recipes/mtmdc/``. They are the
+  record of this campaign, not part of the framework.
 """

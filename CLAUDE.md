@@ -190,11 +190,13 @@ curation/                      # dataset tooling, split by what it is:
 │                              #   each crop against its identity centroid, contact
 │                              #   sheets), combine.py (union sources, recipe-driven),
 │                              #   audit.py (structural audit of any packaged set)
-├── *.py                       #   TRACKED MTMDC detection pipeline (curation.md)
+├── convert_personvit_mim.py   #   TRACKED checkpoint converter
 └── recipes/                   #   gitignored: ONE module or YAML per dataset actually
-                               #   built — paths, scenario lists, held-out identities.
-                               #   Curating a new source = copy the nearest recipe,
-                               #   NOT new tooling.
+                               #   built — paths, scenario lists, held-out identities —
+                               #   plus recipes/mtmdc/ (the persondet_v4-v6 detection
+                               #   pipeline + PLAYBOOK.md; its source footage is no
+                               #   longer on this host). Curating a new source = copy
+                               #   the nearest recipe, NOT new tooling.
 assets/data/                    # datasets, organized BY TASK (all gitignored):
 ├── detection/persondet_v*/     #   YOLO images/+labels/ + COCO annotations/ + rfdetr/
 ├── detection/pia_tracking_prelabel/  # review-pending ensemble pre-labels

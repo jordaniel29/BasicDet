@@ -61,8 +61,8 @@ configs/{yolo,rfdetr,reid}/example*.yaml  # documented templates, one per family
 configs/experiments/      # past run configs (gitignored — a local record)
 curation/                 # dataset tooling
 ├── reid/                 #   reusable: cut crops, review, package, combine, audit
-└── recipes/              #   one module or YAML per dataset actually built
-                          #   (gitignored — a local record, not part of the framework)
+└── recipes/              #   one module or YAML per dataset actually built, plus the
+                          #   MTMDC detection pipeline (gitignored — a local record)
 assets/data/{detection,reid,source}/   # datasets by task (gitignored)
 assets/model/{detection,reid}/         # checkpoints by task (gitignored)
 runs/                     # training / eval outputs (gitignored)
